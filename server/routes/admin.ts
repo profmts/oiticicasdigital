@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, audit, broadcast, getSettings, setSetting, hashPassword, digits, HttpError } from '../core.js';
+import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, audit, broadcast, getSettings, setSetting, hashPassword, digits, confirmPassword, HttpError } from '../core.js';
 import { ROLES, ROLE_LABELS, PERMISSIONS, ROLE_DEFAULTS, effectivePermissions } from '../permissions.js';
 import * as C from '../services/cash.js';
 import { dashboard, REPORTS, runReport, toCsv } from '../services/reports.js';
@@ -123,10 +123,43 @@ adminRouter.put('/customers/:id', requirePerm('customers.view'), h(async (req) =
 }));
 
 // ---------- Usuários da empresa ----------
-adminRouter.get('/users', requirePerm('users.manage'), h(async (req) => (await req.db.all('SELECT id, name, username, role, phone, active, permissions, available, created_at FROM users WHERE tenant_id = $1 ORDER BY active DESC, role, name', [T(req)]))
+adminRouter.get('/users', requirePerm('users.manage'), h(async (req) => (await req.db.all('SELECT id, name, username, role, phone, active, permissions, available, created_at FROM users WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY active DESC, role, name', [T(req)]))
   .map((u) => ({ ...u, effective: effectivePermissions(u.role, u.permissions) }))));
 adminRouter.get('/users/meta', requirePerm('users.manage'), h((req) => ({ roles: ROLES.map((r) => ({ id: r, label: ROLE_LABELS[r], defaults: ROLE_DEFAULTS[r] })), permissions: PERMISSIONS, max_users: req.tenant!.plan?.max_users ?? null })));
-adminRouter.get('/staff', requirePerm('dashboard.view', 'reports.view'), h((req) => req.db.all('SELECT id, name, role FROM users WHERE tenant_id = $1 ORDER BY name', [T(req)])));
+adminRouter.get('/staff', requirePerm('dashboard.view', 'reports.view'), h((req) => req.db.all('SELECT id, name, role FROM users WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY name', [T(req)])));
+
+// M2: remover (excluir) um membro da equipe. Pede a confirmação da senha de quem está removendo (administrador da empresa).
+// Quem tem histórico (lançou pedidos, pagamentos, caixa, etc.) é apenas desativado e escondido, para preservar a auditoria.
+// Quem nunca registrou nada é apagado de vez.
+adminRouter.delete('/users/:id', requirePerm('users.manage'), h(async (req) => {
+  const uid = id(req);
+  const { password } = z.object({ password: z.string().max(200).optional() }).parse(req.body);
+  const target = await req.db.get('SELECT * FROM users WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL', [uid, T(req)]);
+  if (!target) throw notFound('Usuário não encontrado.');
+  if (target.id === req.user!.id) throw bad('Você não pode remover o próprio acesso.');
+  if (target.role === 'admin' && req.user!.role !== 'admin') throw forbidden('Apenas administradores removem administradores.');
+  if (target.role === 'admin') {
+    const admins = (await req.db.get("SELECT COUNT(*) n FROM users WHERE tenant_id = $1 AND role='admin' AND active AND deleted_at IS NULL AND id <> $2", [T(req), uid])).n;
+    if (admins === 0) throw conflict('A empresa precisa de pelo menos um administrador ativo.');
+  }
+  await confirmPassword(req, password);
+  const hist = (await req.db.get(`SELECT (
+      EXISTS(SELECT 1 FROM order_items WHERE created_by = $1)
+      OR EXISTS(SELECT 1 FROM orders WHERE waiter_id = $1 OR courier_id = $1)
+      OR EXISTS(SELECT 1 FROM payments WHERE user_id = $1)
+      OR EXISTS(SELECT 1 FROM cash_sessions WHERE user_id = $1)
+      OR EXISTS(SELECT 1 FROM order_events WHERE user_id = $1)
+      OR EXISTS(SELECT 1 FROM audit_log WHERE user_id = $1 OR authorized_by = $1)
+    ) AS h`, [uid])).h;
+  if (hist) {
+    await req.db.run('UPDATE users SET active = 0, deleted_at = NOW(3), updated_at = NOW(3) WHERE id = $1', [uid]);
+  } else {
+    await req.db.run('DELETE FROM users WHERE id = $1 AND tenant_id = $2', [uid, T(req)]);
+  }
+  await req.db.run("UPDATE sessions SET revoked = true WHERE kind = 'tenant' AND subject_id = $1", [uid]);
+  await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'user.delete', entity: 'user', entityId: uid, data: { username: target.username, role: target.role, soft: !!hist }, ip: req.ip });
+  return { ok: true, soft: !!hist };
+}));
 
 const userSchema = z.object({
   name: z.string().min(2).max(80), username: z.string().min(3).max(40).regex(/^[a-zA-Z0-9._-]+$/, 'Use apenas letras, números, ponto, hífen ou sublinhado.'),

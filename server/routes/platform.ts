@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { h, bad, notFound, conflict, HttpError, PLATFORM_COOKIE, COOKIE, createSession, checkPassword, hashPassword, sha256, audit, requirePlatform, cookieOpts, rateLimit } from '../core.js';
+import { h, bad, notFound, conflict, HttpError, PLATFORM_COOKIE, COOKIE, createSession, checkPassword, hashPassword, sha256, audit, authorizePlatform, requirePlatform, cookieOpts, rateLimit } from '../core.js';
 import { createTenant, newTableToken } from '../seed/catalog.js';
 import { config } from '../config.js';
 
@@ -122,6 +122,51 @@ platformRouter.post('/tenants/:id/reset-password', h(async (req) => {
   await req.db.run('UPDATE users SET password_hash = $1, failed_logins = 0, locked_until = NULL, active = true WHERE id = $2', [await hashPassword(b.password), u.id]);
   await req.db.run("UPDATE sessions SET revoked = true WHERE kind = 'tenant' AND subject_id = $1", [u.id]);
   await audit(req.db, { tenantId: Number(req.params.id), platformUserId: P(req), action: 'platform.password_reset', entity: 'user', entityId: u.id, ip: req.ip });
+  return { ok: true };
+}));
+
+// M3: Reiniciar empresa. Apaga TODOS os dados operacionais e a auditoria da empresa (pedidos, pagamentos,
+// caixas, entregas, clientes), mantém o cardápio, a logo, as cores e as configurações, remove toda a equipe
+// e deixa um único administrador novo. Só o dono da plataforma, confirmando a senha e a frase de segurança.
+platformRouter.post('/tenants/:id/reset', h(async (req) => {
+  const b = z.object({
+    confirm: z.string(),
+    auth: z.object({ username: z.string().max(60), password: z.string().max(200) }).optional(),
+    admin: z.object({ name: z.string().min(2).max(80), username: z.string().min(3).max(40).regex(/^[a-zA-Z0-9._-]+$/, 'Use apenas letras, números, ponto, hífen ou sublinhado.'), password: z.string().min(8).max(200) }),
+  }).parse(req.body);
+  const tid = Number(req.params.id);
+  const tenant = await req.db.get('SELECT id, slug, name FROM tenants WHERE id = $1', [tid]);
+  if (!tenant) throw notFound('Empresa não encontrada.');
+  if (b.confirm.trim().toUpperCase() !== 'REINICIAR') throw bad('Para confirmar, digite a palavra REINICIAR.');
+  const platformUserId = await authorizePlatform(req, b.auth);
+
+  await req.db.tx(async (q) => {
+    await q.run('SET @od_wipe = 1');
+    // Dados operacionais (filhos antes dos pais, por causa das chaves estrangeiras)
+    await q.run('DELETE FROM order_items WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM payments WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM order_events WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM kitchen_tickets WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM cash_movements WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM orders WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM cash_sessions WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM expenses WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM customer_addresses WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM customers WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM audit_log WHERE tenant_id = $1', [tid]);
+    // Equipe: encerra sessões e remove todos os usuários
+    await q.run("UPDATE sessions SET revoked = true WHERE kind = 'tenant' AND subject_id IN (SELECT id FROM users WHERE tenant_id = $1)", [tid]);
+    await q.run('DELETE FROM users WHERE tenant_id = $1', [tid]);
+    // Zera a numeração de pedidos e cria o administrador novo do cliente
+    await q.run('UPDATE tenants SET order_seq = 0 WHERE id = $1', [tid]);
+    await q.run("INSERT INTO users (tenant_id, name, username, password_hash, role) VALUES ($1,$2,$3,$4,'admin')",
+      [tid, b.admin.name, b.admin.username, await hashPassword(b.admin.password)]);
+    await q.run('SET @od_wipe = NULL');
+  });
+
+  // Registro do ato de reinicialização (fica na auditoria da empresa, já zerada, como primeiro evento novo)
+  await audit(req.db, { tenantId: tid, platformUserId, action: 'platform.tenant_reset', entity: 'tenant', entityId: tid,
+    data: { tenant: tenant.slug, new_admin: b.admin.username }, ip: req.ip });
   return { ok: true };
 }));
 

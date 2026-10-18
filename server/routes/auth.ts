@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { h, bad, HttpError, COOKIE, createSession, checkPassword, hashPassword, sha256, audit, requireAuth, cookieOpts, tenantBySlug, tenantActive, rateLimit } from '../core.js';
+import { h, bad, HttpError, COOKIE, createSession, checkPassword, hashPassword, sha256, audit, requireAuth, cookieOpts, tenantBySlug, tenantActive, rateLimit, getSetting } from '../core.js';
 import { config } from '../config.js';
 import { ROLE_HOME, ROLE_LABELS, PERMISSIONS } from '../permissions.js';
 
@@ -13,7 +13,22 @@ export const logoUrl = (t: { logo_file_id: number | null }) => (t.logo_file_id ?
 authRouter.get('/tenant/:slug', h(async (req) => {
   const t = await tenantBySlug(req.db, String(req.params.slug));
   if (!t) throw new HttpError(404, 'Empresa não encontrada. Confira o código de acesso.');
-  return { slug: t.slug, name: t.name, logo_url: logoUrl(t), active: tenantActive(t) };
+  const pin = String((await getSetting(req.db, t.id, 'team_pin')) || '');
+  // pin_login indica que a empresa usa a tela de PIN + escolha de perfil (M11).
+  return { slug: t.slug, name: t.name, logo_url: logoUrl(t), active: tenantActive(t), pin_login: pin.length > 0 };
+}));
+
+// M11: com o PIN correto da loja, devolve a lista de perfis da equipe para o acesso por seleção.
+// O aparelho guarda o PIN; a senha de cada pessoa continua sendo pedida no login.
+authRouter.post('/profiles', h(async (req) => {
+  const { company, pin } = z.object({ company: z.string().min(1).max(60), pin: z.string().min(1).max(20) }).parse(req.body);
+  rateLimit(`pin:${req.ip}`, 20, 10 * 60000, 'Muitas tentativas de PIN. Aguarde alguns minutos.');
+  const t = await tenantBySlug(req.db, company.trim());
+  if (!t || !tenantActive(t)) throw new HttpError(401, 'PIN incorreto.');
+  const real = String((await getSetting(req.db, t.id, 'team_pin')) || '');
+  if (!real || pin.trim() !== real) throw new HttpError(401, 'PIN incorreto.');
+  const users = await req.db.all("SELECT username, name, role FROM users WHERE tenant_id = $1 AND active AND deleted_at IS NULL ORDER BY FIELD(role,'admin','gerente','caixa','cozinha','garcom','motoboy'), name", [t.id]);
+  return { profiles: users.map((u) => ({ username: u.username, name: u.name, role: u.role, role_label: ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] })) };
 }));
 
 authRouter.post('/login', h(async (req, res) => {

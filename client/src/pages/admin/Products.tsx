@@ -1,15 +1,30 @@
 import { useState } from 'react';
-import { api, post, put, patch } from '../../lib/api';
+import { api, post, put, patch, del } from '../../lib/api';
 import { useData } from '../../lib/hooks';
 import { money, parseMoney, centsToInput, SECTOR_LABEL, TYPE_LABEL } from '../../lib/format';
 import { Badge, Button, Field, Input, Modal, MoneyInput, Select, Spinner, Textarea, Toggle, useAction, cx } from '../../components/ui';
 
 const TYPES = ['delivery', 'retirada', 'mesa', 'balcao'];
 
+/** M8: excluir produto, com a confirmação da senha do administrador da empresa. */
+function ExcluirProduto({ produto, onClose, onDone }: { produto: any; onClose: () => void; onDone: () => void }) {
+  const [password, setPass] = useState('');
+  const { run, busy } = useAction();
+  return (
+    <Modal open onClose={onClose} title={`Excluir ${produto.name}`}
+      footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!password}
+        onClick={() => run('x', () => del(`/api/products/${produto.id}`, { password }).then(onDone), 'Produto excluído.')}>Excluir produto</Button>}>
+      <p className="mb-3 text-sm text-lenha-600">O produto <strong>{produto.name}</strong> será removido do cardápio. Se ele já foi vendido, some do cardápio mas é mantido no histórico das vendas antigas. Confirme com a sua senha.</p>
+      <Field label="Sua senha"><Input type="password" value={password} autoComplete="current-password" onChange={(e) => setPass(e.target.value)} /></Field>
+    </Modal>
+  );
+}
+
 export default function Products() {
   const { data, reload } = useData<any>('/api/catalog?all=1', ['catalog'], 0);
   const settings = useData<any>('/api/admin/settings', [], 0);
   const [edit, setEdit] = useState<any>(null);
+  const [excluir, setExcluir] = useState<any>(null);
   const [cat, setCat] = useState<any>(null);
   const [q, setQ] = useState('');
   const { run } = useAction();
@@ -48,6 +63,7 @@ export default function Products() {
                   </div>
                   <Toggle checked={!!p.active} onChange={(v) => run('t', () => patch(`/api/products/${p.id}/toggle`, { active: v }).then(reload), v ? 'Produto disponível.' : 'Produto pausado.')} label={p.active ? 'Disponível' : 'Pausado'} />
                   <Button size="sm" variant="outline" onClick={() => setEdit(toForm(p))}>Editar</Button>
+                  <Button size="sm" variant="ghost" className="text-alerta" onClick={() => setExcluir(p)}>Excluir</Button>
                 </li>
               ))}
               {prods.length === 0 && <li className="px-4 py-3 text-sm text-lenha-500">Nenhum produto nesta categoria.</li>}
@@ -57,6 +73,7 @@ export default function Products() {
       })}
       {edit && <ProductEditor initial={edit} categories={data.categories} sectors={sectors} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
       {cat && <CategoryEditor initial={cat} sectors={sectors} onClose={() => setCat(null)} onSaved={() => { setCat(null); reload(); }} />}
+      {excluir && <ExcluirProduto produto={excluir} onClose={() => setExcluir(null)} onDone={() => { setExcluir(null); reload(); }} />}
     </div>
   );
 }

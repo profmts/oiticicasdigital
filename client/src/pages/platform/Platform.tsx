@@ -172,11 +172,42 @@ function NewTenant({ plans, onClose, onDone }: { plans: any[]; onClose: () => vo
   );
 }
 
+/** M3: Reiniciar empresa. Confirmação com a palavra REINICIAR, a senha do dono da plataforma e o novo administrador. */
+function ReiniciarEmpresa({ tenant, onClose, onDone }: { tenant: any; onClose: () => void; onDone: () => void }) {
+  const [confirm, setConfirm] = useState('');
+  const [auth, setAuth] = useState({ username: '', password: '' });
+  const [admin, setAdmin] = useState({ name: '', username: 'admin', password: '' });
+  const { run, busy } = useAction();
+  const pronto = confirm.trim().toUpperCase() === 'REINICIAR' && auth.username && auth.password && admin.name.length >= 2 && admin.username.length >= 3 && admin.password.length >= 8;
+  return (
+    <Modal open onClose={onClose} title={`Reiniciar ${tenant.name}`} wide
+      footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!pronto}
+        onClick={() => run('x', () => post(`/api/platform/tenants/${tenant.id}/reset`, { confirm, auth, admin }).then(onDone), 'Empresa reiniciada.')}>Reiniciar empresa agora</Button>}>
+      <div className="rounded-xl bg-alerta/10 p-3 text-sm text-lenha-700">Isto apaga todos os dados operacionais e a auditoria de <strong>{tenant.name}</strong> e não pode ser desfeito. O cardápio e as configurações são mantidos.</div>
+      <div className="mt-4 space-y-3">
+        <Field label='Digite REINICIAR para confirmar'><Input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="REINICIAR" /></Field>
+        <p className="text-sm font-semibold">Sua senha de administrador da plataforma</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Usuário da plataforma"><Input value={auth.username} autoCapitalize="none" onChange={(e) => setAuth({ ...auth, username: e.target.value })} /></Field>
+          <Field label="Senha"><Input type="password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} /></Field>
+        </div>
+        <p className="text-sm font-semibold">Administrador que o cliente vai usar</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Field label="Nome"><Input value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} /></Field>
+          <Field label="Usuário"><Input value={admin.username} autoCapitalize="none" onChange={(e) => setAdmin({ ...admin, username: e.target.value.replace(/\s/g, '') })} /></Field>
+          <Field label="Senha (8+)"><Input type="password" value={admin.password} onChange={(e) => setAdmin({ ...admin, password: e.target.value })} /></Field>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function TenantEditor({ tenant, plans, onClose, onDone }: { tenant: any; plans: any[]; onClose: () => void; onDone: () => void }) {
   const [f, setF] = useState({ ...tenant, plan_id: tenant.plan_id ? String(tenant.plan_id) : '', trial_ends_at: tenant.trial_ends_at ? tenant.trial_ends_at.slice(0, 10) : '' });
   const [users, setUsers] = useState<any[]>([]);
   const [adm, setAdm] = useState({ name: '', username: 'admin', password: '' });
   const [reset, setReset] = useState<{ user_id: string; password: string }>({ user_id: '', password: '' });
+  const [reiniciar, setReiniciar] = useState(false);
   const { run, busy } = useAction();
   const toast = useToast();
   useEffect(() => { get(`/api/platform/tenants/${tenant.id}/users`).then(setUsers); }, [tenant.id]);
@@ -226,6 +257,13 @@ function TenantEditor({ tenant, plans, onClose, onDone }: { tenant: any; plans: 
         <p className="text-sm text-lenha-600">Entra no painel da empresa como administrador por até 4 horas. O acesso fica registrado na auditoria da empresa.</p>
         <Button className="mt-2" variant="dark" busy={busy === 'i'} onClick={enter}>Acessar painel da empresa</Button>
       </section>
+
+      <section className="mt-4 rounded-2xl border-2 border-alerta/40 bg-alerta/5 p-4">
+        <h3 className="font-slab text-lg font-bold text-alerta">Reiniciar empresa</h3>
+        <p className="text-sm text-lenha-600">Apaga <strong>todos</strong> os pedidos, pagamentos, caixas, entregas, clientes e a auditoria da empresa, e remove a equipe, deixando só um administrador novo. <strong>Mantém</strong> o cardápio, a logo, as cores e as configurações. Use ao entregar o sistema para o cliente. Não dá para desfazer.</p>
+        <Button className="mt-2" variant="danger" onClick={() => setReiniciar(true)}>Reiniciar esta empresa</Button>
+      </section>
+      {reiniciar && <ReiniciarEmpresa tenant={tenant} onClose={() => setReiniciar(false)} onDone={() => { setReiniciar(false); onDone(); }} />}
     </Modal>
   );
 }

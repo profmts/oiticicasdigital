@@ -1,13 +1,28 @@
 import { useState } from 'react';
-import { post, put } from '../../lib/api';
+import { post, put, del } from '../../lib/api';
 import { useAuth, useData } from '../../lib/hooks';
 import { Badge, Button, Field, Input, Modal, Select, Spinner, Toggle, useAction, cx } from '../../components/ui';
+
+/** M2: remover (excluir) um membro da equipe, com a confirmação da senha do administrador. */
+function RemoverUsuario({ alvo, onClose, onDone }: { alvo: any; onClose: () => void; onDone: () => void }) {
+  const [password, setPass] = useState('');
+  const { run, busy } = useAction();
+  return (
+    <Modal open onClose={onClose} title={`Remover ${alvo.name}`}
+      footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!password}
+        onClick={() => run('x', () => del(`/api/admin/users/${alvo.id}`, { password }).then(onDone), 'Acesso removido.')}>Remover acesso</Button>}>
+      <p className="mb-3 text-sm text-lenha-600">O acesso de <strong>{alvo.name}</strong> (@{alvo.username}) será removido. Se essa pessoa já registrou pedidos ou vendas, o nome dela é mantido no histórico, mas ela deixa de entrar no sistema. Confirme com a sua senha de administrador.</p>
+      <Field label="Sua senha"><Input type="password" value={password} autoComplete="current-password" onChange={(e) => setPass(e.target.value)} /></Field>
+    </Modal>
+  );
+}
 
 export default function Users() {
   const { me } = useAuth();
   const users = useData<any[]>('/api/admin/users', [], 0);
   const meta = useData<any>('/api/admin/users/meta', [], 0);
   const [edit, setEdit] = useState<any>(null);
+  const [remover, setRemover] = useState<any>(null);
   if (!users.data || !meta.data) return <Spinner />;
   const roleLabel = Object.fromEntries(meta.data.roles.map((r: any) => [r.id, r.label]));
   return (
@@ -24,10 +39,12 @@ export default function Users() {
               <p className="text-sm text-lenha-600">@{u.username} · {roleLabel[u.role]}{(u.permissions.grant.length || u.permissions.revoke.length) ? ' · permissões ajustadas' : ''}</p>
             </div>
             <Button size="sm" variant="outline" onClick={() => setEdit({ ...u, password: '', active: !!u.active })}>Editar</Button>
+            {u.id !== me?.id && <Button size="sm" variant="ghost" className="text-alerta" onClick={() => setRemover(u)}>Remover</Button>}
           </li>
         ))}
       </ul>
       {edit && <UserEditor initial={edit} meta={meta.data} self={edit.id === me?.id} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); users.reload(); }} />}
+      {remover && <RemoverUsuario alvo={remover} onClose={() => setRemover(null)} onDone={() => { setRemover(null); users.reload(); }} />}
     </div>
   );
 }

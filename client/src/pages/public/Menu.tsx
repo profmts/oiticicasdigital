@@ -110,13 +110,21 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
       <main className="mx-auto max-w-3xl px-4">
         {!q && featured.length > 0 && (
           <section className="mt-6">
-            <h2 className="font-slab text-2xl font-bold">Destaques</h2>
-            <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2">
+            <h2 className="font-slab text-2xl font-bold">Destaques da casa</h2>
+            <div className="no-scrollbar -mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2">
               {featured.map((p: any) => (
-                <button key={p.id} onClick={() => setOpen(p)} className="w-64 shrink-0 rounded-2xl bg-lenha-900 p-4 text-left text-white">
-                  <p className="font-slab text-lg font-bold leading-tight">{p.name}</p>
-                  {p.description && <p className="mt-1 line-clamp-3 text-sm text-white/75">{p.description}</p>}
-                  <p className="mt-3 font-cond text-2xl font-bold" style={{ color: 'var(--color-brasa-200)' }}>{priceLabel(p, type)}</p>
+                <button key={p.id} onClick={() => setOpen(p)} className="w-56 shrink-0 snap-start overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-lenha-100 transition hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="relative h-32 w-full">
+                    {p.image_url
+                      ? <img src={p.image_url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      : <div className="flex h-full w-full items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-brasa-400), var(--color-brasa-600))' }}><span className="font-slab text-4xl font-bold text-white/90">{p.name[0]}</span></div>}
+                    <span className="absolute left-2 top-2 rounded-full bg-ouro-400 px-2 py-0.5 text-xs font-bold text-lenha-900">Destaque</span>
+                  </div>
+                  <div className="p-3">
+                    <p className="line-clamp-1 font-semibold leading-tight">{p.name}</p>
+                    {p.description && <p className="mt-0.5 line-clamp-2 text-xs text-lenha-500">{p.description}</p>}
+                    <p className="mt-2 font-cond text-xl font-bold text-brasa-700">{priceLabel(p, type)}</p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -125,22 +133,28 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
         {cats.map((c: any) => (
           <section key={c.id} ref={(el) => { sections.current[c.id] = el; }} className="scroll-mt-16 pt-6">
             <h2 className="font-slab text-2xl font-bold">{c.name}</h2>
-            <ul className="mt-2 divide-y divide-lenha-100 rounded-2xl bg-white ring-1 ring-lenha-100">
-              {c.products.map((p: any) => (
+            <ul className="mt-3 space-y-3">
+              {c.products.map((p: any) => {
+                const multi = variantsFor(p, type).length > 1;
+                return (
                 <li key={p.id}>
-                  <button onClick={() => setOpen(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-brasa-50">
-                    {p.image_url && <img src={p.image_url} alt="" loading="lazy" className="size-16 shrink-0 rounded-xl object-cover" />}
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold leading-tight">{p.name}</span>
-                      {p.description && <span className="mt-0.5 block line-clamp-2 text-sm text-lenha-500">{p.description}</span>}
-                      {variantsFor(p, type).length > 1 && <span className="mt-0.5 block text-xs text-lenha-500">{variantsFor(p, type).map((v: any) => `${v.name} ${money(v.price_cents)}`).join(' · ')}</span>}
+                  <button onClick={() => setOpen(p)} className="flex w-full items-stretch gap-3 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-lenha-100 transition hover:ring-brasa-300">
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="font-semibold leading-tight">{p.name}</span>
+                      {p.description && <span className="mt-1 line-clamp-2 text-sm text-lenha-500">{p.description}</span>}
+                      <span className="mt-auto pt-2 font-cond text-xl font-bold text-brasa-700 tabnums">
+                        {multi ? <><span className="font-sans text-xs font-medium text-lenha-500">a partir de </span>{money(minPrice(p))}</> : priceLabel(p, type)}
+                      </span>
                     </span>
-                    <span className="shrink-0 text-right font-cond text-xl font-bold text-brasa-700 tabnums">
-                      {variantsFor(p, type).length > 1 ? <><span className="block font-sans text-xs font-medium text-lenha-500">a partir de</span>{money(minPrice(p))}</> : priceLabel(p, type)}
+                    <span className="relative size-24 shrink-0 self-center">
+                      {p.image_url
+                        ? <img src={p.image_url} alt="" loading="lazy" className="size-24 rounded-xl object-cover" />
+                        : <span className="flex size-24 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, var(--color-brasa-400), var(--color-brasa-600))' }}><span className="font-slab text-3xl font-bold text-white/90">{p.name[0]}</span></span>}
+                      <span className="absolute -bottom-2 -right-2 grid size-8 place-items-center rounded-full bg-brasa-500 text-lg font-bold leading-none text-white shadow-md" aria-hidden>+</span>
                     </span>
                   </button>
                 </li>
-              ))}
+              );})}
             </ul>
           </section>
         ))}

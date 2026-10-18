@@ -48,7 +48,7 @@ export const tenantActive = (t: TenantCtx) => t.status === 'ativo' || (t.status 
 export const feature = (t: TenantCtx | undefined, f: string) => !t?.plan?.features || t.plan.features[f] !== false;
 
 export async function loadUser(q: Q, id: number): Promise<SessionUser | undefined> {
-  const u = await q.get('SELECT id, tenant_id, name, username, role, permissions, active, available FROM users WHERE id = $1', [id]);
+  const u = await q.get('SELECT id, tenant_id, name, username, role, permissions, active, available FROM users WHERE id = $1 AND deleted_at IS NULL', [id]);
   if (!u || !u.active) return undefined;
   return { id: u.id, tenantId: u.tenant_id, name: u.name, username: u.username, role: u.role, available: u.available,
     permissions: effectivePermissions(u.role, u.permissions || {}) };
@@ -117,6 +117,22 @@ export async function authorize(req: Request, perm: Permission, auth?: { usernam
     throw new HttpError(403, 'Autorização recusada: usuário/senha inválidos ou sem permissão.');
   }
   throw new HttpError(403, 'Esta ação precisa de autorização de um supervisor.', { needsAuthorization: perm });
+}
+
+/** Confirma a senha do PRÓPRIO usuário logado (ações destrutivas da empresa, ex.: excluir produto/usuário). */
+export async function confirmPassword(req: Request, password?: string): Promise<void> {
+  if (!req.user) throw new HttpError(401, 'Faça login para continuar.');
+  if (!password) throw new HttpError(403, 'Confirme a sua senha para continuar.', { needsPasswordConfirm: true });
+  const row = await req.db.get('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+  if (!row || !(await checkPassword(password, row.password_hash))) throw new HttpError(403, 'Senha incorreta.');
+}
+
+/** Exige a senha de um administrador da PLATAFORMA (ações só do dono do sistema, ex.: excluir mesa, reiniciar empresa). */
+export async function authorizePlatform(req: Request, auth?: { username?: string; password?: string }): Promise<number> {
+  if (!auth?.username || !auth?.password) throw new HttpError(403, 'Esta ação precisa do usuário e senha do administrador da plataforma.', { needsPlatformAuth: true });
+  const p = await req.db.get('SELECT id, password_hash FROM platform_users WHERE lower(username) = lower($1) AND active', [auth.username]);
+  if (p && (await checkPassword(auth.password, p.password_hash))) return p.id as number;
+  throw new HttpError(403, 'Usuário ou senha do administrador da plataforma inválidos.');
 }
 
 export async function audit(q: Q, p: { tenantId?: number | null; userId?: number | null; platformUserId?: number | null; action: string; entity?: string; entityId?: number | null; data?: unknown; reason?: string | null; authorizedBy?: number | null; ip?: string }) {

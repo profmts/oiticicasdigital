@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import QRCode from 'qrcode';
-import { h, bad, notFound, conflict, requirePerm, audit, broadcast, getSettings, getSetting, HttpError, tenantBySlug, tenantActive, feature, rateLimit, type TenantCtx } from '../core.js';
+import { h, bad, notFound, conflict, requirePerm, audit, broadcast, getSettings, getSetting, confirmPassword, authorizePlatform, HttpError, tenantBySlug, tenantActive, feature, rateLimit, type TenantCtx } from '../core.js';
 import { config } from '../config.js';
 import type { Q } from '../db.js';
 import { createOrder, selfOrderTable, STATUS_LABELS, event } from '../services/orders.js';
@@ -20,7 +20,7 @@ const PUBLIC_SETTINGS = ['store_name', 'slogan', 'whatsapp', 'whatsapp_display',
 export async function loadCatalog(q: Q, t: number, opts: { onlyActive: boolean; onlyOnline: boolean }) {
   const A = opts.onlyActive ? ' AND active' : '';
   const cats = await q.all(`SELECT * FROM categories WHERE tenant_id = $1 ${A} ORDER BY sort, id`, [t]);
-  const prods = await q.all(`SELECT * FROM products WHERE tenant_id = $1 ${A} ${opts.onlyOnline ? ' AND online' : ''} ORDER BY sort, id`, [t]);
+  const prods = await q.all(`SELECT * FROM products WHERE tenant_id = $1 AND deleted_at IS NULL ${A} ${opts.onlyOnline ? ' AND online' : ''} ORDER BY sort, id`, [t]);
   const vars = await q.all(`SELECT * FROM product_variants WHERE tenant_id = $1 ${A} ORDER BY sort, id`, [t]);
   const groups = await q.all('SELECT * FROM option_groups WHERE tenant_id = $1 ORDER BY sort, id', [t]);
   const opts2 = await q.all(`SELECT * FROM options WHERE tenant_id = $1 ${A} ORDER BY sort, id`, [t]);
@@ -241,10 +241,34 @@ catalogRouter.post('/products', requirePerm('products.manage'), h(async (req) =>
 catalogRouter.put('/products/:id', requirePerm('products.manage'), h(async (req) => { const id = await saveProduct(req, Number(req.params.id), productSchema.parse(req.body)); broadcast(T(req), 'catalog'); return { id }; }));
 catalogRouter.patch('/products/:id/toggle', requirePerm('products.manage', 'pdv.use'), h(async (req) => {
   const { active } = z.object({ active: z.boolean() }).parse(req.body);
-  const r = await req.db.run('UPDATE products SET active = $1, updated_at = NOW(3) WHERE id = $2 AND tenant_id = $3', [active, Number(req.params.id), T(req)]);
+  const r = await req.db.run('UPDATE products SET active = $1, updated_at = NOW(3) WHERE id = $2 AND tenant_id = $3 AND deleted_at IS NULL', [active, Number(req.params.id), T(req)]);
   if (!r.rowCount) throw notFound();
   await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: active ? 'product.resume' : 'product.pause', entity: 'product', entityId: Number(req.params.id), ip: req.ip });
   broadcast(T(req), 'catalog'); return { ok: true };
+}));
+
+// M8: excluir produto. Pede a confirmação da senha de quem está excluindo (administrador/gerente da empresa).
+// Produto já vendido some do cardápio mas mantém o vínculo com as vendas antigas (soft delete).
+// Produto nunca vendido é apagado de vez, junto com variações e adicionais.
+catalogRouter.delete('/products/:id', requirePerm('products.manage'), h(async (req) => {
+  const pid = Number(req.params.id);
+  const { password } = z.object({ password: z.string().max(200).optional() }).parse(req.body);
+  const prod = await req.db.get('SELECT * FROM products WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL', [pid, T(req)]);
+  if (!prod) throw notFound('Produto não encontrado.');
+  await confirmPassword(req, password);
+  const sold = await req.db.get('SELECT 1 FROM order_items WHERE product_id = $1 LIMIT 1', [pid]);
+  if (sold) {
+    await req.db.run('UPDATE products SET active = 0, deleted_at = NOW(3), updated_at = NOW(3) WHERE id = $1', [pid]);
+  } else {
+    await req.db.tx(async (q) => {
+      await q.run('DELETE FROM options WHERE group_id IN (SELECT id FROM option_groups WHERE product_id = $1)', [pid]);
+      await q.run('DELETE FROM option_groups WHERE product_id = $1', [pid]);
+      await q.run('DELETE FROM product_variants WHERE product_id = $1 AND tenant_id = $2', [pid, T(req)]);
+      await q.run('DELETE FROM products WHERE id = $1 AND tenant_id = $2', [pid, T(req)]);
+    });
+  }
+  await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'product.delete', entity: 'product', entityId: pid, data: { name: prod.name, soft: !!sold }, ip: req.ip });
+  broadcast(T(req), 'catalog'); return { ok: true, soft: !!sold };
 }));
 
 const catSchema = z.object({ name: z.string().min(2).max(50), sector: z.string().min(2).max(30), sort: z.number().int().default(0), active: z.boolean().default(true) });
@@ -277,11 +301,11 @@ catalogRouter.put('/zones/:id', requirePerm('settings.manage'), h(async (req) =>
 
 // Mesas (cadastro e QR Codes)
 const tableSchema = z.object({ label: z.string().min(1).max(20), seats: z.number().int().min(1).max(50).nullable().optional(), active: z.boolean().default(true), sort: z.number().int().default(0), qr_enabled: z.boolean().default(true) });
-catalogRouter.get('/tables/admin', requirePerm('settings.manage', 'tables.manage'), h((req) => req.db.all('SELECT * FROM dining_tables WHERE tenant_id = $1 ORDER BY sort, label', [T(req)])));
+catalogRouter.get('/tables/admin', requirePerm('settings.manage', 'tables.manage'), h((req) => req.db.all('SELECT * FROM dining_tables WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY sort, label', [T(req)])));
 catalogRouter.post('/tables', requirePerm('settings.manage', 'tables.manage'), h(async (req) => {
   const t = tableSchema.parse(req.body);
   await limit(req, 'max_tables', 'dining_tables', 'mesas', 'AND active');
-  if (await req.db.get('SELECT 1 FROM dining_tables WHERE tenant_id = $1 AND label = $2', [T(req), t.label])) throw bad('Já existe uma mesa com esse nome.');
+  if (await req.db.get('SELECT 1 FROM dining_tables WHERE tenant_id = $1 AND label = $2 AND deleted_at IS NULL', [T(req), t.label])) throw bad('Já existe uma mesa com esse nome.');
   const id = (await req.db.get('INSERT INTO dining_tables (tenant_id, label, seats, active, sort, qr_token, qr_enabled) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id', [T(req), t.label, t.seats ?? null, t.active, t.sort, newTableToken(), t.qr_enabled])).id;
   broadcast(T(req), 'tables'); return { id };
 }));
@@ -299,6 +323,25 @@ catalogRouter.put('/tables/:id', requirePerm('settings.manage', 'tables.manage')
   const t = tableSchema.parse(req.body);
   await req.db.run('UPDATE dining_tables SET label=$1, seats=$2, active=$3, sort=$4, qr_enabled=$5 WHERE id=$6 AND tenant_id=$7', [t.label, t.seats ?? null, t.active, t.sort, t.qr_enabled, Number(req.params.id), T(req)]);
   broadcast(T(req), 'tables'); return { ok: true };
+}));
+// M7: excluir mesa. Protegida pela senha do administrador da PLATAFORMA (o dono do sistema), não do administrador da empresa.
+// Mesa com histórico de pedidos some das listas mas mantém o vínculo com os pedidos antigos (soft delete).
+// Mesa sem nenhum pedido é apagada de vez.
+catalogRouter.delete('/tables/:id', requirePerm('settings.manage', 'tables.manage'), h(async (req) => {
+  const tid = Number(req.params.id);
+  const { auth } = z.object({ auth: z.object({ username: z.string().max(60), password: z.string().max(200) }).optional() }).parse(req.body);
+  const table = await req.db.get('SELECT * FROM dining_tables WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL', [tid, T(req)]);
+  if (!table) throw notFound('Mesa não encontrada.');
+  if (await req.db.get("SELECT 1 FROM orders WHERE table_id = $1 AND type = 'mesa' AND status IN ('aberto','fechamento') LIMIT 1", [tid])) throw conflict('Esta mesa está aberta. Feche a conta antes de excluir.');
+  const platformUserId = await authorizePlatform(req, auth);
+  const hist = await req.db.get('SELECT 1 FROM orders WHERE table_id = $1 LIMIT 1', [tid]);
+  if (hist) {
+    await req.db.run('UPDATE dining_tables SET active = 0, deleted_at = NOW(3) WHERE id = $1', [tid]);
+  } else {
+    await req.db.run('DELETE FROM dining_tables WHERE id = $1 AND tenant_id = $2', [tid, T(req)]);
+  }
+  await audit(req.db, { tenantId: T(req), userId: req.user!.id, platformUserId, action: 'table.delete', entity: 'table', entityId: tid, data: { label: table.label, soft: !!hist }, ip: req.ip });
+  broadcast(T(req), 'tables'); return { ok: true, soft: !!hist };
 }));
 catalogRouter.post('/tables/:id/regenerate-qr', requirePerm('settings.manage', 'tables.manage'), h(async (req) => {
   // invalida o QR antigo (ex.: impresso e levado embora)
