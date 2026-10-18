@@ -44,5 +44,6 @@ export const get = <T = any>(u: string) => api<T>('GET', u);
 export const post = <T = any>(u: string, b: any = {}) => api<T>('POST', u, b);
 export const put = <T = any>(u: string, b: any) => api<T>('PUT', u, b);
 export const patch = <T = any>(u: string, b: any) => api<T>('PATCH', u, b);
+export const del = <T = any>(u: string, b: any = {}) => api<T>('DELETE', u, b);
 
 export const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);

@@ -64,6 +64,13 @@ export default function Settings() {
         <SaveBtn keys={['hide_table_13']} />
       </Section>
 
+      <Section title="Acesso da equipe por PIN" desc="Com um PIN definido, a tela de acesso mostra os perfis da equipe para escolher e pedir só a senha. Deixe em branco para manter o login tradicional (usuário e senha digitados).">
+        <Field label="PIN da loja (somente números, 4 a 8 dígitos)" hint="O aparelho lembra o PIN depois da primeira vez. Compartilhe só com a equipe.">
+          <Input value={s.team_pin || ''} inputMode="numeric" maxLength={8} placeholder="ex.: 2468" onChange={(e) => set('team_pin', e.target.value.replace(/\D/g, ''))} className="w-40" />
+        </Field>
+        <SaveBtn keys={['team_pin']} />
+      </Section>
+
       <Section title="Funcionamento e pedidos online" desc="Abra e feche a loja pelo botão no topo do painel. Tempos estimados e pedido mínimo só aparecem para o cliente quando preenchidos.">
         <div className="space-y-3">
           <Toggle checked={s.accept_delivery} onChange={(v) => set('accept_delivery', v)} label="Aceitar pedidos para entrega" />

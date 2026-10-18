@@ -163,7 +163,12 @@ function TableOrder({ orderId, admin, onClose, onPay }: { orderId: number; admin
       })}
       <div className="flex justify-between border-t border-lenha-100 pt-3 font-cond text-2xl font-bold"><span>Total</span><span className="tabnums">{money(o.total_cents)}</span></div>
       {o.paid_cents > 0 && <p className="text-right text-sm text-ok">Pago: {money(o.paid_cents)}</p>}
-      {admin && can('tables.manage') && open && <button className="mt-4 text-sm font-semibold text-brasa-700 underline" onClick={() => setTransfer(true)}>Transferir mesa ou garçom</button>}
+      {admin && can('tables.manage') && open && (
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <button className="text-sm font-semibold text-brasa-700 underline" onClick={() => setTransfer(true)}>Transferir mesa ou garçom</button>
+          <button className="text-sm font-semibold text-alerta underline disabled:opacity-50" disabled={busy === 'release'} onClick={() => run('release', () => post(`/api/orders/${o.id}/release`).then(onClose), 'Mesa liberada.')}>Liberar mesa</button>
+        </div>
+      )}
 
       {adding && catalog && (
         <Modal open onClose={() => setAdding(false)} title={`Lançar na mesa ${o.table_label}`} wide

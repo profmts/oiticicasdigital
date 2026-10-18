@@ -1,7 +1,24 @@
 import { useState } from 'react';
-import { post, put } from '../../lib/api';
+import { post, put, del } from '../../lib/api';
 import { useAuth, useData } from '../../lib/hooks';
-import { Badge, Button, Field, Input, Spinner, Toggle, useAction } from '../../components/ui';
+import { Badge, Button, Field, Input, Modal, Spinner, Toggle, useAction } from '../../components/ui';
+
+/** M7: excluir mesa exige a senha do administrador da plataforma (o dono do sistema). */
+function ExcluirMesa({ table, onClose, onDone }: { table: any; onClose: () => void; onDone: () => void }) {
+  const [username, setUser] = useState(''); const [password, setPass] = useState('');
+  const { run, busy } = useAction();
+  return (
+    <Modal open onClose={onClose} title={`Excluir a mesa ${table.label}`}
+      footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!username || !password}
+        onClick={() => run('x', () => del(`/api/tables/${table.id}`, { auth: { username, password } }).then(onDone), 'Mesa excluída.')}>Excluir mesa</Button>}>
+      <p className="mb-3 text-sm text-lenha-600">A exclusão de mesa é uma ação do dono do sistema. Informe o usuário e a senha do administrador da plataforma.</p>
+      <div className="space-y-3">
+        <Field label="Usuário da plataforma"><Input value={username} autoCapitalize="none" onChange={(e) => setUser(e.target.value)} /></Field>
+        <Field label="Senha da plataforma"><Input type="password" value={password} onChange={(e) => setPass(e.target.value)} /></Field>
+      </div>
+    </Modal>
+  );
+}
 
 const qrSrc = (url: string) => `/api/public/qrcode.svg?url=${encodeURIComponent(url)}`;
 
@@ -12,6 +29,7 @@ export default function QrCodes() {
   const settings = useData<any>('/api/admin/settings', ['settings'], 0);
   const [count, setCount] = useState('10');
   const [label, setLabel] = useState('');
+  const [excluir, setExcluir] = useState<any>(null);
   const { run, busy } = useAction();
   if (!tables.data || !tenant) return <Spinner />;
   const base = `${location.origin}/${tenant.slug}`;
@@ -86,10 +104,12 @@ export default function QrCodes() {
                 <a href={tableUrl(t)} target="_blank"><Button size="sm" variant="ghost">Testar</Button></a>
                 {can('settings.manage') && <Button size="sm" variant="ghost" onClick={() => confirm(`Gerar um novo QR para a mesa ${t.label}? O QR impresso atual deixa de funcionar.`) && run('r', () => post(`/api/tables/${t.id}/regenerate-qr`).then(tables.reload), 'Novo QR gerado. Imprima e substitua o antigo.')}>Novo QR</Button>}
                 <Button size="sm" variant="ghost" onClick={() => run('a', () => put(`/api/tables/${t.id}`, { label: t.label, seats: t.seats, active: !t.active, sort: t.sort, qr_enabled: t.qr_enabled }).then(tables.reload))}>{t.active ? 'Desativar mesa' : 'Reativar'}</Button>
+                {can('settings.manage') && <Button size="sm" variant="ghost" className="text-alerta" onClick={() => setExcluir(t)}>Excluir</Button>}
               </div>
             </article>
           ))}
         </div>
+        {excluir && <ExcluirMesa table={excluir} onClose={() => setExcluir(null)} onDone={() => { setExcluir(null); tables.reload(); }} />}
         <form className="mt-4 flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); run('t', () => post('/api/tables', { label, sort: tables.data!.length + 1 }).then(() => { setLabel(''); tables.reload(); }), 'Mesa adicionada.'); }}>
           <Field label="Nova mesa (nome ou número)"><Input value={label} onChange={(e) => setLabel(e.target.value)} className="w-44" /></Field>
           <Button type="submit" variant="outline" disabled={!label.trim()} busy={busy === 't'}>Adicionar</Button>
