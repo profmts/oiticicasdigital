@@ -63,9 +63,11 @@ img { max-width: 100%; }
 }
 
 /* Telas da equipe (cozinha, garçom, motoboy): uma única fonte (Barlow) em tudo,
-   inclusive onde o resto do sistema usa a fonte de títulos ou a condensada. */
+   inclusive onde o resto do sistema usa a fonte de títulos ou a condensada.
+   A Barlow é mais leve que a Sora e a condensada, então reforçamos o peso e
+   apertamos levemente os títulos e números para manter a mesma presença. */
 .tela-equipe { font-family: var(--font-sans); }
-.tela-equipe .font-slab, .tela-equipe .font-cond { font-family: var(--font-sans); }
+.tela-equipe .font-slab, .tela-equipe .font-cond { font-family: var(--font-sans); font-weight: 800; letter-spacing: -0.015em; }
 
 .tabnums { font-variant-numeric: tabular-nums; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
