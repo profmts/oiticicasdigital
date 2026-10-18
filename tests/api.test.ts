@@ -37,6 +37,7 @@ class Client {
   get(u: string) { return this.req('GET', u); }
   post(u: string, b: unknown = {}) { return this.req('POST', u, b); }
   put(u: string, b: unknown) { return this.req('PUT', u, b); }
+  del(u: string, b: unknown = {}) { return this.req('DELETE', u, b); }
   async login(username: string, password = 'senha123', company = 'espetinho-do-sergio') { const r = await this.post('/api/auth/login', { company, username, password }); assert.equal(r.status, 200, JSON.stringify(r.data)); return this; }
 }
 const ok = (r: { status: number; data: any }, code = 200) => { assert.equal(r.status, code, JSON.stringify(r.data)); return r.data; };
@@ -370,4 +371,91 @@ test('22 tempo real isolado e CSRF', async () => {
   assert.equal(evil.status, 403);
   const logo = await fetch(base + ok(await admin.get('/api/auth/me')).tenant.logo_url);
   assert.equal(logo.status, 200); assert.equal(logo.headers.get('content-type'), 'image/jpeg');
+});
+
+test('23 M2: remover membro da equipe (senha + soft/hard delete)', async () => {
+  const id = ok(await admin.post('/api/admin/users', { name: 'Temp Um', username: 'temp1', role: 'garcom', password: 'senha123' })).id;
+  assert.equal((await admin.del(`/api/admin/users/${id}`)).status, 403, 'precisa da senha do administrador');
+  assert.equal((await admin.del(`/api/admin/users/${id}`, { password: 'errada' })).status, 403);
+  const me = ok(await admin.get('/api/auth/me')).user;
+  assert.equal((await admin.del(`/api/admin/users/${me.id}`, { password: 'senhaForte123' })).status, 400, 'não remove a si mesmo');
+  assert.equal(ok(await admin.del(`/api/admin/users/${id}`, { password: 'senhaForte123' })).soft, false, 'sem histórico: apagado de vez');
+  assert.ok(!ok(await admin.get('/api/admin/users')).some((u: any) => u.id === id), 'sumiu da lista');
+  // garçom com histórico (ana lançou itens) é apenas desativado
+  const anaHist = await db.get('SELECT 1 FROM order_items WHERE created_by = $1 LIMIT 1', [users['ana']]);
+  if (anaHist) {
+    assert.equal(ok(await admin.del(`/api/admin/users/${users['ana']}`, { password: 'senhaForte123' })).soft, true, 'com histórico: desativado e escondido');
+    assert.equal((await new Client().post('/api/auth/login', { company: SLUG, username: 'ana', password: 'senha123' })).status, 401, 'removido não loga');
+  }
+});
+
+test('24 M8: excluir produto (senha + soft/hard delete)', async () => {
+  const cat = menu.categories.find((c: any) => c.name === 'Porções');
+  const id = ok(await admin.post('/api/products', { category_id: cat.id, name: 'Produto Excluir', order_types: ['balcao'], variants: [{ name: 'Único', price_cents: 500 }] })).id;
+  assert.equal((await admin.del(`/api/products/${id}`)).status, 403, 'precisa da senha');
+  assert.equal(ok(await admin.del(`/api/products/${id}`, { password: 'senhaForte123' })).soft, false, 'nunca vendido: apagado de vez');
+  assert.ok(!(await db.get('SELECT 1 FROM products WHERE id = $1', [id])), 'removido do banco');
+  // produto vendido: cria, vende no PDV, exclui -> soft delete
+  const id2 = ok(await admin.post('/api/products', { category_id: cat.id, name: 'Produto Vendido', order_types: ['balcao', 'retirada'], variants: [{ name: 'Único', price_cents: 700 }] })).id;
+  const cat2 = ok(await admin.get('/api/catalog?all=1'));
+  const v = cat2.categories.flatMap((c: any) => c.products).find((x: any) => x.id === id2).variants[0].id;
+  const o = ok(await caixa.post('/api/orders', { type: 'retirada', customer_name: 'C', items: [{ variant_id: v, qty: 1 }] }));
+  assert.equal(ok(await admin.del(`/api/products/${id2}`, { password: 'senhaForte123' })).soft, true, 'vendido: soft delete');
+  assert.ok((await db.get('SELECT deleted_at FROM products WHERE id = $1', [id2])).deleted_at, 'marcado como excluído');
+  assert.ok(!ok(await publico.get(`/api/public/${SLUG}/menu`)).categories.flatMap((c: any) => c.products).some((p: any) => p.id === id2), 'some do cardápio');
+});
+
+test('25 M7: excluir mesa exige a senha do administrador da plataforma', async () => {
+  const id = ok(await admin.post('/api/tables', { label: 'T99' })).id;
+  assert.equal((await admin.del(`/api/tables/${id}`)).status, 403, 'precisa da senha da plataforma');
+  assert.equal((await admin.del(`/api/tables/${id}`, { auth: { username: 'sergio', password: 'senhaForte123' } })).status, 403, 'senha da empresa não serve');
+  assert.equal(ok(await admin.del(`/api/tables/${id}`, { auth: { username: 'root', password: 'senhaMuitoForte1' } })).soft, false, 'sem histórico: apagada de vez');
+  assert.ok(!ok(await admin.get('/api/tables/admin')).some((t: any) => t.id === id), 'sumiu da lista de mesas');
+});
+
+test('26 M5: liberar mesa vazia; recusar mesa com consumo', async () => {
+  const tid = ok(await admin.post('/api/tables', { label: 'T-REL' })).id;
+  const o1 = ok(await admin.post('/api/orders', { type: 'mesa', table_id: tid, guests: 2 }));
+  ok(await admin.post(`/api/orders/${o1.id}/release`));
+  assert.equal(ok(await admin.get('/api/tables')).find((t: any) => t.id === tid)?.state, 'livre', 'mesa vazia liberada');
+  const o2 = ok(await admin.post('/api/orders', { type: 'mesa', table_id: tid, guests: 2 }));
+  ok(await admin.post(`/api/orders/${o2.id}/items`, { items: [{ variant_id: variant('Espeto de carne'), qty: 1 }], send: true }));
+  assert.equal((await admin.post(`/api/orders/${o2.id}/release`)).status, 409, 'mesa com consumo não é liberada direto');
+});
+
+test('27 M11: acesso com PIN devolve os perfis da equipe', async () => {
+  assert.equal(ok(await new Client().get(`/api/auth/tenant/${SLUG}`)).pin_login, false, 'sem PIN configurado');
+  ok(await admin.put('/api/admin/settings', { team_pin: '2468' }));
+  assert.equal(ok(await new Client().get(`/api/auth/tenant/${SLUG}`)).pin_login, true);
+  assert.equal((await new Client().post('/api/auth/profiles', { company: SLUG, pin: '0000' })).status, 401, 'PIN errado');
+  const prof = ok(await new Client().post('/api/auth/profiles', { company: SLUG, pin: '2468' })).profiles;
+  assert.ok(prof.some((p: any) => p.username === 'sergio' && p.role === 'admin'), 'lista traz o admin');
+  ok(await admin.put('/api/admin/settings', { team_pin: '' })); // desliga o PIN ao final
+});
+
+test('28 M3: reiniciar empresa apaga dados e auditoria, mantém cardápio e deixa um admin', async () => {
+  const r = ok(await plat.post('/api/platform/tenants', { name: 'Reset Teste', slug: 'reset-teste', admin: { name: 'Adm', username: 'adm', password: 'senhaForte123' }, tables: 3 }));
+  const rid = r.id;
+  const c = new Client(); await c.login('adm', 'senhaForte123', 'reset-teste');
+  // cria um produto e um pedido para ter o que apagar
+  const catId = ok(await c.post('/api/categories', { name: 'Geral', sector: 'cozinha' })).id;
+  const pid = ok(await c.post('/api/products', { category_id: catId, name: 'Item Teste', order_types: ['balcao','retirada'], variants: [{ name: 'Único', price_cents: 500 }] })).id;
+  const cats2 = ok(await c.get('/api/catalog?all=1'));
+  const vv = cats2.categories.flatMap((x: any) => x.products).find((p: any) => p.id === pid).variants[0].id;
+  ok(await c.post('/api/orders', { type: 'retirada', customer_name: 'Z', items: [{ variant_id: vv, qty: 1 }] }));
+  const before = await db.get('SELECT (SELECT COUNT(*) FROM orders WHERE tenant_id=$1) o, (SELECT COUNT(*) FROM products WHERE tenant_id=$1) p, (SELECT COUNT(*) FROM users WHERE tenant_id=$1) u', [rid]);
+  assert.ok(before.o >= 1 && before.p >= 1);
+  // confirmação errada e senha errada são recusadas
+  assert.equal((await plat.post(`/api/platform/tenants/${rid}/reset`, { confirm: 'x', auth: { username: 'root', password: 'senhaMuitoForte1' }, admin: { name: 'Novo', username: 'novoadm', password: 'senhaForte123' } })).status, 400);
+  assert.equal((await plat.post(`/api/platform/tenants/${rid}/reset`, { confirm: 'REINICIAR', auth: { username: 'root', password: 'errada' }, admin: { name: 'Novo', username: 'novoadm', password: 'senhaForte123' } })).status, 403);
+  ok(await plat.post(`/api/platform/tenants/${rid}/reset`, { confirm: 'REINICIAR', auth: { username: 'root', password: 'senhaMuitoForte1' }, admin: { name: 'Novo Dono', username: 'novoadm', password: 'senhaForte123' } }));
+  const after = await db.get('SELECT (SELECT COUNT(*) FROM orders WHERE tenant_id=$1) o, (SELECT COUNT(*) FROM products WHERE tenant_id=$1) p, (SELECT COUNT(*) FROM users WHERE tenant_id=$1) u, (SELECT COUNT(*) FROM audit_log WHERE tenant_id=$1) a', [rid]);
+  assert.equal(after.o, 0, 'pedidos apagados');
+  assert.ok(after.p >= 1, 'cardápio mantido');
+  assert.equal(after.u, 1, 'só um administrador');
+  assert.equal(after.a, 1, 'auditoria zerada, só o registro da reinicialização');
+  const reset = await db.get("SELECT action FROM audit_log WHERE tenant_id=$1", [rid]);
+  assert.equal(reset.action, 'platform.tenant_reset');
+  const nc = new Client(); await nc.login('novoadm', 'senhaForte123', 'reset-teste');
+  assert.equal(ok(await nc.get('/api/auth/me')).user.role, 'admin', 'novo admin entra');
 });

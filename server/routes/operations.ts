@@ -150,6 +150,18 @@ opsRouter.post('/orders/:id/cancel', h(async (req) => {
   return O.orderDetail(req.db, T(req), o.id, req.user);
 }));
 
+// M5: liberar (limpar) uma mesa. Para mesa sem consumo, libera na hora. Para mesa com consumo,
+// orienta a receber a conta ou cancelar os itens antes, para não sumir dinheiro sem registro.
+opsRouter.post('/orders/:id/release', requirePerm('tables.manage'), h(async (req) => {
+  const o = await loadForUser(req, id(req));
+  if (o.type !== 'mesa' || !['aberto', 'fechamento'].includes(o.status)) throw conflict('Só é possível liberar uma mesa aberta.');
+  const itens = (await req.db.get("SELECT COUNT(*) n FROM order_items WHERE order_id = $1 AND status <> 'cancelado'", [o.id])).n;
+  if (itens > 0) throw conflict('Esta mesa tem consumo. Receba a conta ou cancele os itens antes de liberar.');
+  await O.cancelOrder(req.db, T(req), o.id, req.user!, 'Mesa liberada (estava sem consumo)', req.user!.id, req.ip);
+  broadcast(T(req), 'tables'); broadcast(T(req), 'orders');
+  return { ok: true };
+}));
+
 opsRouter.post('/items/:id/cancel', h(async (req) => {
   const p = z.object({ reason: z.string().min(3).max(300), auth: authSchema }).parse(req.body);
   const it = await req.db.get('SELECT * FROM order_items WHERE id = $1 AND tenant_id = $2', [id(req), T(req)]);
