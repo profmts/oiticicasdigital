@@ -35,7 +35,7 @@ export default function Audit() {
                   <td className="whitespace-nowrap px-4 py-2">{dateTime(a.created_at)}</td>
                   <td>{a.user_name || '—'}{a.authorized_name && <span className="block text-xs text-lenha-500">autorizado por {a.authorized_name}</span>}</td>
                   <td className="font-semibold">{LABEL[a.action] || a.action}{a.entity === 'order' && a.entity_id ? ` (pedido id ${a.entity_id})` : ''}</td>
-                  <td className="max-w-md pr-4 text-xs text-lenha-600">{a.reason && <span className="block text-sm text-lenha-900">Motivo: {a.reason}</span>}<span className="break-all">{a.data_json}</span></td>
+                  <td className="max-w-md pr-4 text-xs text-lenha-600">{a.reason && <span className="block text-sm text-lenha-900">Motivo: {a.reason}</span>}{a.data_json != null && <span className="break-all">{typeof a.data_json === 'string' ? a.data_json : JSON.stringify(a.data_json)}</span>}</td>
                 </tr>
               ))}
             </tbody>
