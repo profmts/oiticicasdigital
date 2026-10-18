@@ -33,7 +33,7 @@ export function PlatformLogin() {
       <form onSubmit={submit} className="w-full max-w-sm rounded-3xl bg-white p-7 shadow-2xl">
         <PlatformWordmark />
         <h1 className="mt-6 font-slab text-2xl font-bold">{setup ? 'Configurar a plataforma' : 'Administração da plataforma'}</h1>
-        <p className="mt-1 text-sm text-lenha-600">{setup ? 'Crie o primeiro acesso de administrador da OUTICICAS DIGITAL.' : 'Área do dono e do suporte da plataforma.'}</p>
+        <p className="mt-1 text-sm text-lenha-600">{setup ? 'Crie o primeiro acesso de administrador da OITICICAS DIGITAL.' : 'Área do dono e do suporte da plataforma.'}</p>
         <div className="mt-5 space-y-3">
           {setup && <Field label="Seu nome"><Input value={f.name} onChange={up('name')} required /></Field>}
           <Field label="Usuário"><Input value={f.username} onChange={up('username')} autoCapitalize="none" autoComplete="username" required /></Field>

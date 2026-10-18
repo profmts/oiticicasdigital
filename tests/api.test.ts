@@ -1,6 +1,6 @@
 /**
  * Testes de integração da API (servidor real + banco MySQL/MariaDB de teste, recriado a cada execução).
- * Banco: TEST_DATABASE_URL (padrão mysql://od:od123@127.0.0.1:3306/outicicas_test). NUNCA aponte para produção.
+ * Banco: TEST_DATABASE_URL (padrão mysql://od:od123@127.0.0.1:3306/oiticicas_test). NUNCA aponte para produção.
  * Cobrem o checklist operacional, o isolamento entre empresas (SaaS) e o pedido pelo QR Code da mesa.
  */
 import { test, before, after } from 'node:test';
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 
 import mysql from 'mysql2/promise';
-const TEST_URL = process.env.TEST_DATABASE_URL || 'mysql://od:od123@127.0.0.1:3306/outicicas_test';
+const TEST_URL = process.env.TEST_DATABASE_URL || 'mysql://od:od123@127.0.0.1:3306/oiticicas_test';
 {
   const u = new URL(TEST_URL); const name = u.pathname.slice(1);
   if (!/_test$/.test(name)) throw new Error('O banco de teste precisa terminar em _test (proteção contra apagar dados reais).');
@@ -278,7 +278,19 @@ test('16 QR Code da mesa: cliente pede, chama garçom, equipe confirma e envia �
   assert.equal((await publico.get(qr)).status, 404);
 });
 
+test('16b M6: ocultar a mesa 13 some do salão sem apagar a mesa', async () => {
+  ok(await admin.post('/api/tables', { label: '13', sort: 13 }));
+  assert.ok(ok(await garcom.get('/api/tables')).some((t: any) => t.label === '13'), 'mesa 13 aparece quando não está oculta');
+  ok(await admin.put('/api/admin/settings', { hide_table_13: true }));
+  assert.ok(!ok(await garcom.get('/api/tables')).some((t: any) => t.label === '13'), 'mesa 13 some quando oculta');
+  assert.ok(await db.get("SELECT 1 FROM dining_tables WHERE label = '13'"), 'a mesa 13 continua existindo no banco');
+  ok(await admin.put('/api/admin/settings', { hide_table_13: false }));
+});
+
 test('17 QR do balcão: pedido presencial sem mesa aguarda confirmação', async () => {
+  // O QR do balcão vem desligado por padrão; a empresa precisa ligar para aceitar pedidos.
+  assert.equal((await publico.post(`/api/public/${SLUG}/orders`, { idempotency_key: 'balcao-0000', type: 'balcao', customer_name: 'Rui', items: [{ variant_id: variant('Batata frita'), qty: 1 }] })).status, 400);
+  ok(await admin.put('/api/admin/settings', { self_order_counter_enabled: true }));
   const r = ok(await publico.post(`/api/public/${SLUG}/orders`, { idempotency_key: 'balcao-0001', type: 'balcao', customer_name: 'Rui', items: [{ variant_id: variant('Batata frita'), qty: 1 }] }));
   const o = await db.get('SELECT * FROM orders WHERE public_token = $1', [r.token]);
   assert.equal(o.channel, 'qrcode'); assert.equal(o.type, 'balcao'); assert.equal(o.status, 'aguardando_confirmacao');

@@ -126,7 +126,7 @@ export async function migrate(db: DB) {
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
   // Trava para duas instâncias não migrarem ao mesmo tempo
   await db.tx(async (q) => {
-    await q.get("SELECT GET_LOCK('outicicas_migrate', 60) AS l");
+    await q.get("SELECT GET_LOCK('oiticicas_migrate', 60) AS l");
     try {
       for (const f of files) {
         if (await q.get('SELECT 1 FROM schema_migrations WHERE name = $1', [f])) continue;
@@ -142,7 +142,7 @@ export async function migrate(db: DB) {
         await q.run('INSERT INTO schema_migrations (name) VALUES ($1)', [f]);
         console.log(`[db] migration aplicada: ${f}`);
       }
-    } finally { await q.get("SELECT RELEASE_LOCK('outicicas_migrate') AS l"); }
+    } finally { await q.get("SELECT RELEASE_LOCK('oiticicas_migrate') AS l"); }
   });
 }
 

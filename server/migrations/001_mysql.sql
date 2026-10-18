@@ -1,4 +1,4 @@
--- OUTICICAS DIGITAL — esquema multiempresa para MySQL 8+ / MariaDB 10.6+
+-- OITICICAS DIGITAL — esquema multiempresa para MySQL 8+ / MariaDB 10.6+
 -- Datas em UTC (DATETIME(3)); valores em centavos (INT); JSON guardado como texto.
 
 CREATE TABLE plans (

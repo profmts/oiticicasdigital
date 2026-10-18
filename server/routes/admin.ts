@@ -178,6 +178,7 @@ const settingsSchema = z.object({
   pix_key: z.string().max(120), banners: z.array(z.object({ title: z.string().max(60), subtitle: z.string().max(140), category: z.string().max(60).optional(), image_url: z.string().max(300).optional() })).max(8),
   kitchen_sectors: z.array(z.string().max(30)).min(1).max(10), timezone: z.string().max(60),
   self_order_enabled: z.boolean(), self_order_auto_kitchen: z.boolean(), self_order_counter_enabled: z.boolean(),
+  hide_table_13: z.boolean(), team_pin: z.string().max(20).regex(/^\d*$/, 'O PIN deve conter apenas números.'),
   brand_color: hex, brand_dark: hex, menu_font: z.enum(['modern', 'slab']),
 }).partial();
 const SAFE_KEYS = ['store_name', 'whatsapp', 'whatsapp_display', 'address', 'city', 'prep_alert_minutes', 'payment_methods', 'kitchen_sectors', 'is_open', 'pix_key', 'brand_color', 'brand_dark', 'timezone', 'self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled'];

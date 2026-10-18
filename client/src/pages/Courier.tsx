@@ -27,7 +27,7 @@ export default function Courier() {
   const done = (data?.deliveries || []).filter((d: any) => d.status === 'concluido');
 
   return (
-    <div className="min-h-dvh pb-8">
+    <div className="tela-equipe min-h-dvh pb-8">
       <header className="tech-grid sticky top-0 z-20 flex items-center gap-3 px-4 py-3 text-white">
         <TenantLogo url={tenant?.logo_url} name={tenant?.name || ''} className="size-10 rounded-lg bg-white object-contain text-xs" />
         <div className="leading-tight"><p className="font-slab text-lg font-bold">Minhas entregas</p><p className="text-sm text-lenha-200">{me?.name}</p></div>

@@ -10,7 +10,7 @@ As tabelas são criadas sozinhas na primeira vez que o sistema inicia.
 ### 1. Criar o banco MySQL
 hPanel → **Websites → Painel do site → Bancos de dados → Gerenciamento**.
 Informe nome do banco, usuário e uma senha forte e clique em **Criar**. Anote os três dados
-(a Hostinger acrescenta um prefixo, ex.: `u123456789_outicicas`).
+(a Hostinger acrescenta um prefixo, ex.: `u123456789_oiticicas`).
 
 ### 2. Criar o Node.js Web App
 hPanel → **Websites → Adicionar site → Node.js Web App** → **Enviar seus arquivos** (o .zip do sistema)
@@ -27,8 +27,8 @@ Configurações de build:
 NODE_ENV=production
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=u123456789_outicicas
-DB_USER=u123456789_outicicas
+DB_NAME=u123456789_oiticicas
+DB_USER=u123456789_oiticicas
 DB_PASSWORD=<senha do banco>
 DATABASE_POOL=5
 SETUP_TOKEN=<código longo e aleatório>
@@ -62,7 +62,7 @@ Observações:
 ## Opção B — VPS da Hostinger (KVM) com Docker
 
 ```bash
-git clone <seu-repositório> outicicas && cd outicicas   # ou envie o .zip e descompacte
+git clone <seu-repositório> oiticicas && cd oiticicas   # ou envie o .zip e descompacte
 cp .env.example .env && nano .env
 ```
 Preencha `DOMAIN`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` e `SETUP_TOKEN` (ex.: `openssl rand -hex 24`).
@@ -70,13 +70,13 @@ As variáveis `DB_*` não são usadas aqui (o docker-compose preenche a conexão
 
 ```bash
 docker compose up -d --build
-docker compose logs -f app      # aguarde "OUTICICAS DIGITAL rodando..."
+docker compose logs -f app      # aguarde "OITICICAS DIGITAL rodando..."
 ```
 Crie os registros DNS **A** `@` (e `www`) apontando para o IP do VPS; o Caddy emite o HTTPS sozinho.
 
 - Atualizar: `git pull && docker compose up -d --build` (as migrations rodam sozinhas).
 - Backup diário: o serviço `backup` grava `mysqldump` em `./backups` (14 dias).
-- Restaurar: `gunzip -c backups/arquivo.sql.gz | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" outicicas'`
+- Restaurar: `gunzip -c backups/arquivo.sql.gz | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" oiticicas'`
 
 ---
 

@@ -82,7 +82,9 @@ export function defaultSettings(name: string): Record<string, unknown> {
     // Pedido presencial pelo QR Code
     self_order_enabled: true,          // QR das mesas aceita pedidos
     self_order_auto_kitchen: false,    // false = garçom/caixa confirma antes de ir para a cozinha
-    self_order_counter_enabled: true,  // QR do balcão (sem mesa): pedido para retirar no balcão
+    self_order_counter_enabled: false, // QR do balcão (sem mesa): desligado por padrão; a empresa liga se quiser
+    hide_table_13: false,              // ocultar a mesa de número 13 (superstição), opção do administrador
+    team_pin: '',                      // PIN da loja para a tela de acesso por perfil; vazio = login digitado tradicional
     // Identidade visual do cardápio
     brand_color: '#2563eb', brand_dark: '#0f172a', menu_font: 'modern',
   };

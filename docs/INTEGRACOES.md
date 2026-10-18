@@ -18,7 +18,7 @@ Valores são referências aproximadas — **confirme o preço atual com cada for
 
 ## Cobrança das mensalidades do SaaS — próxima etapa
 - **Opções:** Asaas, Mercado Pago (assinaturas), Pagar.me, Iugu — todas com boleto, Pix e cartão recorrente.
-- **Requisitos:** conta PJ da OUTICICAS DIGITAL no gateway, chave de API e URL de webhook com HTTPS.
+- **Requisitos:** conta PJ da OITICICAS DIGITAL no gateway, chave de API e URL de webhook com HTTPS.
 - **No sistema:** os planos já existem com preço; falta ligar cada empresa a uma assinatura e usar o webhook para
   manter a empresa ativa ou suspendê-la automaticamente em caso de atraso (hoje a suspensão é manual no painel).
 - **Custo:** taxa por cobrança do gateway (varia por meio de pagamento).

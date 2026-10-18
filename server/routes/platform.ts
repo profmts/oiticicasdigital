@@ -4,7 +4,7 @@ import { h, bad, notFound, conflict, HttpError, PLATFORM_COOKIE, COOKIE, createS
 import { createTenant, newTableToken } from '../seed/catalog.js';
 import { config } from '../config.js';
 
-/** Painel da plataforma OUTICICAS DIGITAL: empresas, planos e suporte. */
+/** Painel da plataforma OITICICAS DIGITAL: empresas, planos e suporte. */
 export const platformRouter = Router();
 const DUMMY = hashPassword('x-inexistente');
 const RESERVED = new Set(['admin', 'entrar', 'plataforma', 'api', 'garcom', 'cozinha', 'motoboy', 'imprimir', 'files', 'assets', 'uploads', 'pedido', 'mesa', 'login', 'www', 'app', 'suporte']);
