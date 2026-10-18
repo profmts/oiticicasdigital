@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/*
+ * OUTICICAS DIGITAL — paleta tecnológica do sistema (painéis da equipe e da plataforma).
+ * Os nomes dos tokens são internos: "brasa" = cor de ação, "lenha" = neutros/fundo escuro,
+ * "ouro" = destaque de atenção, "papel" = fundo claro.
+ * No cardápio público, a empresa sobrescreve esses tokens com a própria identidade (ver TenantTheme).
+ */
+@theme {
+  --color-brasa-50: #eef4ff;
+  --color-brasa-100: #dbe6ff;
+  --color-brasa-200: #b8ccff;
+  --color-brasa-400: #5b8cff;
+  --color-brasa-500: #2f6bff;
+  --color-brasa-600: #1f55e6;
+  --color-brasa-700: #1a44b8;
+  --color-neon-300: #67e8f9;
+  --color-neon-400: #22d3ee;
+  --color-neon-500: #06b6d4;
+  --color-ouro-300: #fde68a;
+  --color-ouro-400: #fbbf24;
+  --color-ouro-500: #f59e0b;
+  --color-lenha-50: #f2f5fa;
+  --color-lenha-100: #e3e9f2;
+  --color-lenha-200: #cdd6e4;
+  --color-lenha-300: #98a6bd;
+  --color-lenha-500: #5b6b85;
+  --color-lenha-700: #2a3954;
+  --color-lenha-800: #141f36;
+  --color-lenha-900: #0a1224;
+  --color-papel: #f6f8fc;
+  --color-ok: #16a34a;
+  --color-alerta: #dc2626;
+
+  --font-slab: "Sora", system-ui, sans-serif;
+  --font-sans: "Barlow", system-ui, sans-serif;
+  --font-cond: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body { @apply bg-papel text-lenha-900 font-sans antialiased; }
+:focus-visible { outline: 3px solid var(--color-neon-400); outline-offset: 2px; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+img { max-width: 100%; }
+
+/* Fundo "circuito" da marca: grade fina sobre o azul-marinho */
+.tech-grid {
+  background-color: var(--color-lenha-900);
+  background-image:
+    linear-gradient(rgb(34 211 238 / .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(34 211 238 / .07) 1px, transparent 1px),
+    radial-gradient(120% 80% at 0% 0%, rgb(47 107 255 / .35), transparent 60%);
+  background-size: 28px 28px, 28px 28px, 100% 100%;
+}
+
+/* Ticket de cozinha: borda picotada no topo, como a comanda de papel */
+.ticket { position: relative; background: #fff; }
+.ticket::before {
+  content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 12px;
+  background: radial-gradient(circle at 6px 0, transparent 6px, #fff 6.5px) repeat-x;
+  background-size: 14px 12px;
+}
+
+.tabnums { font-variant-numeric: tabular-nums; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgb(47 107 255 / .55); } 100% { box-shadow: 0 0 0 14px rgb(47 107 255 / 0); } }
+.pulse-new { animation: pulse-ring 1.4s ease-out 3; }
+@keyframes blink-call { 50% { opacity: .55; } }
+.blink { animation: blink-call 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .pulse-new, .blink { animation: none; } * { scroll-behavior: auto !important; } }
+
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .print-break { break-inside: avoid; }
+}

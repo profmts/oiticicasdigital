@@ -1,0 +1,63 @@
+# Hostinger VPS (ou qualquer servidor Linux com Docker):
+#   cp .env.example .env   → edite domínio, senhas e SETUP_TOKEN
+#   docker compose up -d --build
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--log-bin-trust-function-creators=1"]
+    environment:
+      MYSQL_DATABASE: outicicas
+      MYSQL_USER: outicicas
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?defina MYSQL_PASSWORD no .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD no .env}
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      retries: 12
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://outicicas:${MYSQL_PASSWORD}@db:3306/outicicas
+      COOKIE_SECURE: "true"
+      TRUST_PROXY: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?defina DOMAIN no .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - app
+
+  # Backup diário do banco (mantém 14 dias) em ./backups
+  backup:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_PWD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c", "while true; do mysqldump -h db -uroot --single-transaction --routines --triggers outicicas | gzip > /backups/outicicas-$$(date +%F).sql.gz && find /backups -name '*.sql.gz' -mtime +14 -delete; sleep 86400; done"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysqldata:
+  caddy_data:

@@ -1,0 +1,9 @@
+# HTTPS automático (Let's Encrypt). O domínio vem da variável DOMAIN do .env.
+{$DOMAIN}, www.{$DOMAIN} {
+	encode gzip zstd
+	@www host www.{$DOMAIN}
+	redir @www https://{$DOMAIN}{uri} permanent
+	reverse_proxy app:3000 {
+		flush_interval -1
+	}
+}
