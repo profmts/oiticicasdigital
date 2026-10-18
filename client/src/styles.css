@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * OUTICICAS DIGITAL — paleta tecnológica do sistema (painéis da equipe e da plataforma).
+ * OITICICAS DIGITAL — paleta tecnológica do sistema (painéis da equipe e da plataforma).
  * Os nomes dos tokens são internos: "brasa" = cor de ação, "lenha" = neutros/fundo escuro,
  * "ouro" = destaque de atenção, "papel" = fundo claro.
  * No cardápio público, a empresa sobrescreve esses tokens com a própria identidade (ver TenantTheme).
@@ -61,6 +61,11 @@ img { max-width: 100%; }
   background: radial-gradient(circle at 6px 0, transparent 6px, #fff 6.5px) repeat-x;
   background-size: 14px 12px;
 }
+
+/* Telas da equipe (cozinha, garçom, motoboy): uma única fonte (Barlow) em tudo,
+   inclusive onde o resto do sistema usa a fonte de títulos ou a condensada. */
+.tela-equipe { font-family: var(--font-sans); }
+.tela-equipe .font-slab, .tela-equipe .font-cond { font-family: var(--font-sans); }
 
 .tabnums { font-variant-numeric: tabular-nums; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

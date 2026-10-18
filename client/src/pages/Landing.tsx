@@ -42,7 +42,7 @@ export default function Landing() {
         ))}
       </section>
       <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-6 text-sm text-white/50">
-        <span>© {new Date().getFullYear()} OUTICICAS DIGITAL</span>
+        <span>© {new Date().getFullYear()} OITICICAS DIGITAL</span>
         <Link to="/plataforma" className="hover:text-white">Administração da plataforma</Link>
       </footer>
     </div>

@@ -7,8 +7,8 @@ services:
     restart: unless-stopped
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--log-bin-trust-function-creators=1"]
     environment:
-      MYSQL_DATABASE: outicicas
-      MYSQL_USER: outicicas
+      MYSQL_DATABASE: oiticicas
+      MYSQL_USER: oiticicas
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?defina MYSQL_PASSWORD no .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD no .env}
     volumes:
@@ -24,7 +24,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: mysql://outicicas:${MYSQL_PASSWORD}@db:3306/outicicas
+      DATABASE_URL: mysql://oiticicas:${MYSQL_PASSWORD}@db:3306/oiticicas
       COOKIE_SECURE: "true"
       TRUST_PROXY: "true"
     depends_on:
@@ -53,7 +53,7 @@ services:
       MYSQL_PWD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - ./backups:/backups
-    entrypoint: ["/bin/sh", "-c", "while true; do mysqldump -h db -uroot --single-transaction --routines --triggers outicicas | gzip > /backups/outicicas-$$(date +%F).sql.gz && find /backups -name '*.sql.gz' -mtime +14 -delete; sleep 86400; done"]
+    entrypoint: ["/bin/sh", "-c", "while true; do mysqldump -h db -uroot --single-transaction --routines --triggers oiticicas | gzip > /backups/oiticicas-$$(date +%F).sql.gz && find /backups -name '*.sql.gz' -mtime +14 -delete; sleep 86400; done"]
     depends_on:
       db:
         condition: service_healthy

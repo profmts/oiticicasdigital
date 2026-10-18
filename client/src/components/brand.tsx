@@ -1,8 +1,8 @@
 import { cx } from './ui';
 
-/** Marca da plataforma OUTICICAS DIGITAL (arquivo original enviado, só com o fundo removido). */
+/** Marca da plataforma OITICICAS DIGITAL (arquivo original enviado, só com o fundo removido). */
 export function PlatformLogo({ light, className }: { light?: boolean; className?: string }) {
-  return <img src={light ? '/outicicas-logo-white.png' : '/outicicas-logo.png'} alt="OUTICICAS DIGITAL" className={cx('object-contain', className)} />;
+  return <img src={light ? '/oiticicas-logo-white.png' : '/oiticicas-logo.png'} alt="OITICICAS DIGITAL" className={cx('object-contain', className)} />;
 }
 
 export function PlatformWordmark({ light, size = 'md' }: { light?: boolean; size?: 'sm' | 'md' | 'lg' }) {
@@ -12,7 +12,7 @@ export function PlatformWordmark({ light, size = 'md' }: { light?: boolean; size
     <span className="inline-flex items-center gap-2.5">
       <PlatformLogo light={light} className={s + ' w-auto'} />
       <span className={cx('font-slab font-bold leading-none tracking-tight', t, light ? 'text-white' : 'text-lenha-900')}>
-        OUTICICAS<span className={cx('block font-sans font-semibold tracking-[0.3em]', size === 'lg' ? 'text-base' : 'text-[0.6em]', light ? 'text-neon-300' : 'text-brasa-600')}>DIGITAL</span>
+        OITICICAS<span className={cx('block font-sans font-semibold tracking-[0.3em]', size === 'lg' ? 'text-base' : 'text-[0.6em]', light ? 'text-neon-300' : 'text-brasa-600')}>DIGITAL</span>
       </span>
     </span>
   );

@@ -1,10 +1,10 @@
 /**
- * Cria um banco de DEMONSTRAÇÃO separado (padrão: outicicas_demo) com empresas, usuários e pedidos fictícios.
+ * Cria um banco de DEMONSTRAÇÃO separado (padrão: oiticicas_demo) com empresas, usuários e pedidos fictícios.
  * Usa DEMO_DATABASE_URL — nunca DATABASE_URL: o banco de produção não é tocado.
  * O nome do banco precisa terminar em _demo (proteção contra apagar dados reais).
  */
 import mysql from 'mysql2/promise';
-const DEMO_URL = process.env.DEMO_DATABASE_URL || 'mysql://od:od123@127.0.0.1:3306/outicicas_demo';
+const DEMO_URL = process.env.DEMO_DATABASE_URL || 'mysql://od:od123@127.0.0.1:3306/oiticicas_demo';
 {
   const u = new URL(DEMO_URL); const name = u.pathname.slice(1);
   if (!/_demo$/.test(name)) throw new Error('O banco de demonstração precisa terminar em _demo.');
@@ -26,7 +26,7 @@ const db = await openDatabase(DEMO_URL);
 await seedPlatform(db);
 const PASS = 'demo1234';
 const h = await hashPassword(PASS);
-await db.run('INSERT INTO platform_users (name, username, password_hash) VALUES ($1,$2,$3)', ['Suporte OUTICICAS (demo)', 'suporte', await hashPassword('demo12345678')]);
+await db.run('INSERT INTO platform_users (name, username, password_hash) VALUES ($1,$2,$3)', ['Suporte OITICICAS (demo)', 'suporte', await hashPassword('demo12345678')]);
 
 const t = (await db.get("SELECT id FROM tenants WHERE slug = 'espetinho-do-sergio'")).id;
 await applySettings(db, t, { is_open: true });

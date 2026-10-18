@@ -39,7 +39,7 @@ export default function Kitchen() {
   const list = data || [];
 
   return (
-    <div className="tech-grid min-h-dvh text-white">
+    <div className="tela-equipe tech-grid min-h-dvh text-white">
       <header className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-white/10 bg-lenha-900/95 px-3 py-2 backdrop-blur">
         <TenantLogo url={tenant?.logo_url} name={tenant?.name || ''} className="size-10 rounded-lg bg-white object-contain text-xs" />
         <h1 className="font-slab text-2xl font-bold">Cozinha</h1>

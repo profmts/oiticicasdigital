@@ -1,7 +1,7 @@
 {
-  "name": "outicicas-digital",
+  "name": "oiticicas-digital",
   "version": "1.0.0",
-  "description": "OUTICICAS DIGITAL — plataforma SaaS de cardápio digital, PDV, delivery e gestão para restaurantes",
+  "description": "OITICICAS DIGITAL — plataforma SaaS de cardápio digital, PDV, delivery e gestão para restaurantes",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch server/index.ts",
@@ -9,7 +9,7 @@
     "build": "vite build && esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js && node scripts/copy-assets.mjs",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "demo:seed": "tsx scripts/seed-demo.ts",
-    "demo": "npm run demo:seed && DATABASE_URL=${DEMO_DATABASE_URL:-mysql://od:od123@127.0.0.1:3306/outicicas_demo} DEMO_MODE=true node dist/server.js",
+    "demo": "npm run demo:seed && DATABASE_URL=${DEMO_DATABASE_URL:-mysql://od:od123@127.0.0.1:3306/oiticicas_demo} DEMO_MODE=true node dist/server.js",
     "typecheck": "tsc -p .",
     "test": "node --import tsx --test tests/*.test.ts"
   },

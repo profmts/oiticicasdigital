@@ -59,6 +59,11 @@ export default function Settings() {
         <SaveBtn keys={['self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled']} />
       </Section>
 
+      <Section title="Mesas" desc="Ajustes das mesas do salão.">
+        <Toggle checked={!!s.hide_table_13} onChange={(v) => set('hide_table_13', v)} label="Ocultar a mesa 13 (pula o número 13 no salão e no QR, sem apagar a mesa)" />
+        <SaveBtn keys={['hide_table_13']} />
+      </Section>
+
       <Section title="Funcionamento e pedidos online" desc="Abra e feche a loja pelo botão no topo do painel. Tempos estimados e pedido mínimo só aparecem para o cliente quando preenchidos.">
         <div className="space-y-3">
           <Toggle checked={s.accept_delivery} onChange={(v) => set('accept_delivery', v)} label="Aceitar pedidos para entrega" />

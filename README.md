@@ -1,4 +1,4 @@
-# OUTICICAS DIGITAL
+# OITICICAS DIGITAL
 
 Plataforma SaaS para restaurantes: cada empresa tem o próprio cardápio digital, pedidos pelo QR Code da mesa,
 PDV, cozinha (KDS), garçons, delivery com área do motoboy, caixa, financeiro, relatórios e auditoria —
@@ -11,7 +11,7 @@ WhatsApp, endereço e cores que já tinha.
 
 | Endereço | Quem usa |
 |---|---|
-| `/` | Página da plataforma OUTICICAS DIGITAL |
+| `/` | Página da plataforma OITICICAS DIGITAL |
 | `/plataforma` | Dono/suporte da plataforma: empresas, planos, equipe, auditoria |
 | `/<empresa>` | Cardápio digital da empresa (delivery e retirada). Ex.: `/espetinho-do-sergio` |
 | `/<empresa>/mesa/<código>` | **Pedido presencial pelo QR Code da mesa** |
@@ -38,7 +38,7 @@ WhatsApp, endereço e cores que já tinha.
 - **Isolamento:** todas as consultas filtram pela empresa; os testes verificam que uma empresa não lê nem altera dados de outra.
 - **Suporte:** a plataforma pode entrar no painel de uma empresa por até 4 h, com motivo registrado na auditoria da empresa.
 - **Identidade:** cada empresa define logo, cor principal, cor escura e estilo dos títulos do cardápio.
-  Os painéis usam a identidade tecnológica da OUTICICAS DIGITAL.
+  Os painéis usam a identidade tecnológica da OITICICAS DIGITAL.
 
 ## Instalação local
 
@@ -58,7 +58,7 @@ Gerenciar**, crie o administrador da empresa. Ele entra em `/espetinho-do-sergio
 ```bash
 npm run build && npm run demo
 ```
-Usa um banco separado (`DEMO_DATABASE_URL`, padrão `mysql://od:od123@127.0.0.1:3306/outicicas_demo`; o nome precisa
+Usa um banco separado (`DEMO_DATABASE_URL`, padrão `mysql://od:od123@127.0.0.1:3306/oiticicas_demo`; o nome precisa
 terminar em `_demo`). O banco de produção nunca é tocado.
 - Plataforma: `/plataforma` — usuário `suporte`, senha `demo12345678`
 - Espetinho (`espetinho-do-sergio`): `admin`, `gerente`, `caixa`, `garcom1`, `cozinha`, `motoboy1` — senha `demo1234`
@@ -69,7 +69,7 @@ terminar em `_demo`). O banco de produção nunca é tocado.
 ```bash
 npm run dev          # API (3000) + interface com recarga (5173)
 npm test             # 22 testes de integração num banco MySQL de teste recriado a cada execução
-                     # (TEST_DATABASE_URL, padrão mysql://od:od123@127.0.0.1:3306/outicicas_test; nome termina em _test)
+                     # (TEST_DATABASE_URL, padrão mysql://od:od123@127.0.0.1:3306/oiticicas_test; nome termina em _test)
 npm run typecheck
 python3 tests/e2e_browser.py   # fluxo completo no navegador (Playwright), com `npm run demo` rodando
 ```

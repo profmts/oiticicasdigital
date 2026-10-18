@@ -99,6 +99,7 @@ async function tableByToken(req: Request) {
   const t = await publicTenant(req);
   const table = await req.db.get('SELECT * FROM dining_tables WHERE tenant_id = $1 AND qr_token = $2 AND active', [t.id, String(req.params.token)]);
   if (!table) throw notFound('QR Code de mesa inválido. Peça ajuda ao garçom.');
+  if (table.label === '13' && (await getSetting(req.db, t.id, 'hide_table_13'))) throw notFound('QR Code de mesa inválido. Peça ajuda ao garçom.');
   const enabled = feature(t, 'self_order') && table.qr_enabled && (await getSetting(req.db, t.id, 'self_order_enabled'));
   return { t, table, enabled: !!enabled };
 }

@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, authorize, audit, broadcast, sseSubscribe, type SessionUser } from '../core.js';
+import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, authorize, audit, broadcast, sseSubscribe, getSetting, type SessionUser } from '../core.js';
 import * as O from '../services/orders.js';
 import * as C from '../services/cash.js';
 
@@ -215,7 +215,9 @@ opsRouter.get('/couriers', requirePerm('delivery.manage', 'orders.view'), h(asyn
 // ---------- Mesas ----------
 opsRouter.get('/tables', requirePerm('tables.use'), h(async (req) => {
   const u = req.user!;
-  const tables = await req.db.all('SELECT id, label, seats, sort, qr_enabled FROM dining_tables WHERE tenant_id = $1 AND active ORDER BY sort, label', [T(req)]);
+  const hide13 = await getSetting(req.db, T(req), 'hide_table_13');
+  let tables = await req.db.all('SELECT id, label, seats, sort, qr_enabled FROM dining_tables WHERE tenant_id = $1 AND active ORDER BY sort, label', [T(req)]);
+  if (hide13) tables = tables.filter((t) => t.label !== '13');
   const open = await req.db.all(`${LIST_SQL} WHERE o.tenant_id = $1 AND o.type = 'mesa' AND o.status IN ('aberto','fechamento')`, [T(req)]);
   const tick = await req.db.all(`SELECT order_id, status, COUNT(*) n FROM kitchen_tickets WHERE tenant_id = $1 AND status IN ('novo','preparo','pronto') GROUP BY order_id, status`, [T(req)]);
   const pend = await req.db.all(`SELECT order_id, COUNT(*) n FROM order_items WHERE tenant_id = $1 AND status = 'pendente' GROUP BY order_id`, [T(req)]);

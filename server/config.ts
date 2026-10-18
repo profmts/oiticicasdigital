@@ -19,7 +19,7 @@ export const config = {
   cookieSecure: process.env.COOKIE_SECURE === 'true',
   demoMode: process.env.DEMO_MODE === 'true',
   trustProxy: process.env.TRUST_PROXY === 'true',
-  platformName: process.env.PLATFORM_NAME || 'OUTICICAS DIGITAL',
+  platformName: process.env.PLATFORM_NAME || 'OITICICAS DIGITAL',
   /** cria a empresa Espetinho do Sergio automaticamente na primeira execução */
   seedEspetinho: process.env.SEED_ESPETINHO !== 'false',
   maxUploadBytes: 3 * 1024 * 1024,

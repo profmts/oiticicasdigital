@@ -41,7 +41,7 @@ export default function Login() {
           <p className="font-slab text-4xl font-bold leading-tight">Pedidos, cozinha, mesas e caixa no mesmo lugar.</p>
           <p className="mt-4 text-lg text-white/70">Cada pessoa da equipe entra com o próprio usuário e vê só o que precisa para trabalhar.</p>
         </div>
-        <p className="text-sm text-white/50">© {new Date().getFullYear()} OUTICICAS DIGITAL</p>
+        <p className="text-sm text-white/50">© {new Date().getFullYear()} OITICICAS DIGITAL</p>
       </div>
       <div className="flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm">
