@@ -125,7 +125,7 @@ export function ProductPicker({ catalog, type, onAdd, compact }: { catalog: any;
           <button key={c.id} onClick={() => setCat(c.id)} className={cx('h-10 shrink-0 rounded-full px-4 text-sm font-semibold', cat === c.id ? 'bg-lenha-900 text-white' : 'bg-white text-lenha-700 border border-lenha-200')}>{c.name}</button>
         ))}
       </div>
-      <div className={cx('grid gap-2 overflow-y-auto', compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4')}>
+      <div className={cx('scroll-visible grid gap-2 overflow-y-auto', compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4')}>
         {prods.map((p: any) => (
           <button key={p.id} onClick={() => pick(p)} className="flex min-h-20 flex-col justify-between rounded-xl border border-lenha-100 bg-white p-3 text-left hover:border-brasa-400 active:bg-brasa-50">
             <span className="font-semibold leading-tight">{p.name}</span>

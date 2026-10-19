@@ -6,7 +6,7 @@ import { money, parseMoney } from '../../lib/format';
 import { ProductPicker, CartList, cartTotal, type CartLine } from '../../components/catalog';
 import { PaymentDialog } from '../../components/PaymentDialog';
 import { OrderDrawer } from '../../components/OrderDrawer';
-import { Button, Field, Input, Select, MoneyInput, Toggle, Modal, Spinner, useAction, cx } from '../../components/ui';
+import { Button, Field, Input, Select, MoneyInput, PhoneInput, Toggle, Modal, Spinner, useAction, cx } from '../../components/ui';
 
 type Kind = 'balcao' | 'retirada' | 'delivery';
 
@@ -80,12 +80,12 @@ export default function PDV() {
           <button key={k} onClick={() => setKind(k)} className={cx('h-10 rounded-lg text-sm font-semibold', kind === k ? 'bg-lenha-900 text-white' : 'text-lenha-700')}>{k === 'balcao' ? 'Balcão' : k === 'retirada' ? 'Retirada' : 'Delivery'}</button>
         ))}
       </div>
-      <div className="mt-2 flex-1 overflow-y-auto">
+      <div className="scroll-visible mt-2 flex-1 overflow-y-auto">
         <CartList lines={lines} setLines={setLines} />
         {(kind !== 'balcao' || showCust) && (
           <div className="mt-3 space-y-2 border-t border-lenha-100 pt-3">
             <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Telefone" value={cust.phone} onChange={up('phone')} onBlur={lookup} inputMode="tel" aria-label="Telefone do cliente" />
+              <PhoneInput placeholder="Telefone" value={cust.phone} onChange={(v) => setCust((x) => ({ ...x, phone: v }))} onBlur={lookup} aria-label="Telefone do cliente" />
               <Input placeholder="Nome do cliente" value={cust.name} onChange={up('name')} aria-label="Nome do cliente" />
             </div>
             {kind !== 'balcao' && (

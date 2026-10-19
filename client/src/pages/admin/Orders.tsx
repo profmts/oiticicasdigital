@@ -69,7 +69,7 @@ export default function Orders() {
                 <span className={cx('rounded-full px-2 text-sm font-bold tabnums', items.length ? 'bg-lenha-900 text-white' : 'text-lenha-300')}>{items.length}</span>
               </header>
               {c.hint && <p className="px-2 text-xs text-lenha-500">{c.hint}</p>}
-              <div className="mt-2 flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto">
+              <div className="scroll-visible mt-2 flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto">
                 {items.map((o) => {
                   const ref = o.status === 'aguardando_confirmacao' ? o.created_at : o.confirmed_at || o.created_at;
                   const mins = minutesSince(ref, now);

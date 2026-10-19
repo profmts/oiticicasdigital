@@ -493,3 +493,20 @@ test('30 redefinir configurações para o padrão de fábrica (preserva identida
   assert.equal(after.pix_key, 'chave-pix-dono', 'chave Pix preservada');
   assert.ok(await db.get("SELECT 1 FROM audit_log WHERE action = 'settings.reset' AND tenant_id = $1", [r.id]), 'reinício fica na auditoria');
 });
+
+test('31 CPF opcional no pedido fica guardado no cadastro do cliente', async () => {
+  ok(await admin.put('/api/admin/settings', { is_open: true, accept_pickup: true }));
+  const r = ok(await publico.post(`/api/public/${SLUG}/orders`, {
+    idempotency_key: 'cpftest-0001', type: 'retirada', customer_name: 'Cliente CPF', customer_phone: '(83) 98888-7777',
+    customer_cpf: '123.456.789-01', payment_hint: 'dinheiro', items: [{ variant_id: variant('Espeto de carne'), qty: 1 }],
+  }));
+  assert.ok(r.token, 'pedido criado');
+  const c = await db.get('SELECT cpf, phone FROM customers WHERE tenant_id = $1 AND phone = $2', [espId, '83988887777']);
+  assert.equal(c.cpf, '12345678901', 'guarda só os dígitos do CPF');
+  // CPF incompleto não é guardado (campo é opcional)
+  ok(await publico.post(`/api/public/${SLUG}/orders`, {
+    idempotency_key: 'cpftest-0002', type: 'retirada', customer_name: 'Sem CPF', customer_phone: '(83) 98888-7777',
+    customer_cpf: '123', payment_hint: 'dinheiro', items: [{ variant_id: variant('Espeto de carne'), qty: 1 }],
+  }));
+  assert.equal((await db.get('SELECT cpf FROM customers WHERE tenant_id = $1 AND phone = $2', [espId, '83988887777'])).cpf, '12345678901', 'CPF anterior preservado');
+});

@@ -4,7 +4,7 @@ import { get, post, uid } from '../../lib/api';
 import { money, parseMoney, waLink, phoneFmt, time } from '../../lib/format';
 import { tenantTheme } from '../../lib/theme';
 import { ProductModal, priceLabel, variantsFor, cartTotal, lineTotal, type CartLine } from '../../components/catalog';
-import { Button, Field, Input, Select, Textarea, Modal, MoneyInput, Spinner, ErrorBox, cx } from '../../components/ui';
+import { Button, Field, Input, Select, Textarea, Modal, MoneyInput, PhoneInput, CpfInput, Spinner, ErrorBox, cx } from '../../components/ui';
 import { TenantLogo, PlatformLogo } from '../../components/brand';
 
 type Mode = 'online' | 'mesa' | 'balcao';
@@ -405,7 +405,7 @@ function Checkout({ slug, data, type, setType, cart, setCart, invalid, onClose }
   const bothTypes = s.accept_delivery && s.accept_pickup;
   const CK = `od_customer_${slug}`;
   const saved = load<any>(CK, {});
-  const [f, setF] = useState({ name: saved.name || '', phone: saved.phone || '', street: saved.street || '', number: saved.number || '', complement: saved.complement || '',
+  const [f, setF] = useState({ name: saved.name || '', phone: saved.phone || '', cpf: saved.cpf || '', street: saved.street || '', number: saved.number || '', complement: saved.complement || '',
     neighborhood: saved.neighborhood || '', zone: saved.zone ? String(saved.zone) : '', reference: saved.reference || '', payment: '', change: '', notes: '', remember: !!saved.name });
   const [key] = useState(uid);
   const [busy, setBusy] = useState(false);
@@ -433,14 +433,14 @@ function Checkout({ slug, data, type, setType, cart, setCart, invalid, onClose }
     setBusy(true);
     try {
       const r = await post(`/api/public/${slug}/orders`, {
-        idempotency_key: key, type, customer_name: f.name, customer_phone: f.phone,
+        idempotency_key: key, type, customer_name: f.name, customer_phone: f.phone, customer_cpf: f.cpf || undefined,
         address: type === 'delivery' ? { street: f.street, number: f.number, complement: f.complement, neighborhood: zone ? zone.name : f.neighborhood, reference: f.reference } : undefined,
         delivery_zone_id: type === 'delivery' && zone ? zone.id : null, payment_hint: f.payment,
         change_for_cents: f.payment === 'dinheiro' && Number.isFinite(change) && change > 0 ? change : null,
         notes: f.notes, save_address: f.remember && type === 'delivery',
         items: cart.map((l) => ({ variant_id: l.variant_id, qty: l.qty, option_ids: l.option_ids, notes: l.notes || undefined })),
       });
-      save(CK, f.remember ? { name: f.name, phone: f.phone, street: f.street, number: f.number, complement: f.complement, neighborhood: f.neighborhood, zone: f.zone, reference: f.reference } : {});
+      save(CK, f.remember ? { name: f.name, phone: f.phone, cpf: f.cpf, street: f.street, number: f.number, complement: f.complement, neighborhood: f.neighborhood, zone: f.zone, reference: f.reference } : {});
       setCart([]);
       nav(`/${slug}/pedido/${r.token}?novo=1`);
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
@@ -466,7 +466,8 @@ function Checkout({ slug, data, type, setType, cart, setCart, invalid, onClose }
       <CartLines cart={cart} setCart={setCart} invalid={invalid} type={type} />
       <section className="mt-5 grid gap-3 sm:grid-cols-2">
         <Field label="Seu nome"><Input value={f.name} onChange={up('name')} autoComplete="name" /></Field>
-        <Field label="WhatsApp com DDD"><Input value={f.phone} onChange={up('phone')} inputMode="tel" autoComplete="tel" placeholder="(00) 9 0000-0000" /></Field>
+        <Field label="WhatsApp com DDD"><PhoneInput value={f.phone} onChange={(v) => setF((x) => ({ ...x, phone: v }))} /></Field>
+        <Field label="CPF (opcional)" hint="Se quiser informar, para identificação ou nota." className="sm:col-span-2"><CpfInput value={f.cpf} onChange={(v) => setF((x) => ({ ...x, cpf: v }))} /></Field>
       </section>
       {type === 'delivery' ? (
         <section className="mt-4 grid gap-3 sm:grid-cols-6">

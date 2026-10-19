@@ -44,7 +44,7 @@ export default function Reports() {
             <h1 className="font-slab text-xl font-bold">{data.title}</h1>
             <p className="mb-3 text-sm text-lenha-500">{date(from)} a {date(to)} · calculado a partir dos registros do sistema</p>
             {data.rows.length === 0 ? <p className="py-8 text-center text-lenha-500">Sem registros no período.</p> : (
-              <div className="overflow-x-auto">
+              <div className="scroll-visible overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="text-left text-lenha-500">{data.columns.map((c: any) => <th key={c[0]} className={cx('py-1 pr-3', ['money', 'int', 'min'].includes(c[2]) && 'text-right')}>{c[1]}</th>)}</tr></thead>
                   <tbody>
