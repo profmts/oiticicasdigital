@@ -1,7 +1,7 @@
 // Testes das máscaras de entrada (dinheiro, telefone, CPF) usadas nos formulários.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { maskCents, maskPhone, maskCpf, parseMoney } from '../client/src/lib/format.ts';
+import { maskCents, maskPhone, maskCpf, parseMoney } from '../client/src/lib/format.js';
 
 test('maskCents: centavos, reais e milhares', () => {
   assert.equal(maskCents(''), '');
