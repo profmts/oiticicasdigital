@@ -52,7 +52,6 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
   const total = cartTotal(cart);
   const count = cart.reduce((a, l) => a + l.qty, 0);
   const go = (cid: number) => { setActiveCat(cid); sections.current[cid]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-  const minPrice = (p: any) => Math.min(...variantsFor(p, type).map((v: any) => v.price_cents));
 
   return (
     <div style={tenantTheme(s)} className="pb-28 text-lenha-900">
@@ -75,22 +74,17 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
                 <span className={cx('inline-flex items-center gap-2 font-semibold', s.is_open ? 'text-ok' : 'text-alerta')}>
                   <span className={cx('size-2.5 rounded-full', s.is_open ? 'bg-ok' : 'bg-alerta')} />{s.is_open ? 'Aberto agora' : 'Fechado'}
                 </span>
-                {s.is_open && type === 'delivery' && s.delivery_estimate_minutes && <span className="text-sm text-lenha-600">Entrega em cerca de {s.delivery_estimate_minutes} min</span>}
-                {s.is_open && type === 'retirada' && s.pickup_estimate_minutes && <span className="text-sm text-lenha-600">Retirada em cerca de {s.pickup_estimate_minutes} min</span>}
+                {s.is_open && s.accept_delivery && s.delivery_estimate_minutes && <span className="text-sm text-lenha-600">Entrega ~{s.delivery_estimate_minutes} min</span>}
+                {s.is_open && s.accept_pickup && s.pickup_estimate_minutes && <span className="text-sm text-lenha-600">Retirada ~{s.pickup_estimate_minutes} min</span>}
                 {s.min_order_cents > 0 && <span className="text-sm text-lenha-600">Pedido mínimo {money(s.min_order_cents)}</span>}
               </div>
               {!s.is_open && <p className="mt-2 text-sm text-lenha-700">{s.closed_message}</p>}
-              <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-lenha-50 p-1" role="tablist" aria-label="Como você quer receber">
-                {(['delivery', 'retirada'] as const).map((t) => {
-                  const enabled = t === 'delivery' ? s.accept_delivery : s.accept_pickup;
-                  return (
-                    <button key={t} role="tab" aria-selected={type === t} disabled={!enabled} onClick={() => setType(t)}
-                      className={cx('h-11 rounded-lg font-semibold transition-colors', type === t ? 'bg-lenha-900 text-white' : 'text-lenha-700', !enabled && 'opacity-40')}>
-                      {t === 'delivery' ? 'Entrega' : 'Retirar no local'}
-                    </button>
-                  );
-                })}
-              </div>
+              {s.is_open && (
+                <p className="mt-2 text-sm text-lenha-600">
+                  {s.accept_delivery && s.accept_pickup ? 'Entrega ou retirada no local — você escolhe ao finalizar o pedido.'
+                    : s.accept_delivery ? 'Pedidos para entrega.' : s.accept_pickup ? 'Somente retirada no local.' : ''}
+                </p>
+              )}
             </>
           )}
         </div>
@@ -131,32 +125,7 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
           </section>
         )}
         {cats.map((c: any) => (
-          <section key={c.id} ref={(el) => { sections.current[c.id] = el; }} className="scroll-mt-16 pt-6">
-            <h2 className="font-slab text-2xl font-bold">{c.name}</h2>
-            <ul className="mt-3 space-y-3">
-              {c.products.map((p: any) => {
-                const multi = variantsFor(p, type).length > 1;
-                return (
-                <li key={p.id}>
-                  <button onClick={() => setOpen(p)} className="flex w-full items-stretch gap-3 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-lenha-100 transition hover:ring-brasa-300">
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="font-semibold leading-tight">{p.name}</span>
-                      {p.description && <span className="mt-1 line-clamp-2 text-sm text-lenha-500">{p.description}</span>}
-                      <span className="mt-auto pt-2 font-cond text-xl font-bold text-brasa-700 tabnums">
-                        {multi ? <><span className="font-sans text-xs font-medium text-lenha-500">a partir de </span>{money(minPrice(p))}</> : priceLabel(p, type)}
-                      </span>
-                    </span>
-                    <span className="relative size-24 shrink-0 self-center">
-                      {p.image_url
-                        ? <img src={p.image_url} alt="" loading="lazy" className="size-24 rounded-xl object-cover" />
-                        : <span className="flex size-24 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, var(--color-brasa-400), var(--color-brasa-600))' }}><span className="font-slab text-3xl font-bold text-white/90">{p.name[0]}</span></span>}
-                      <span className="absolute -bottom-2 -right-2 grid size-8 place-items-center rounded-full bg-brasa-500 text-lg font-bold leading-none text-white shadow-md" aria-hidden>+</span>
-                    </span>
-                  </button>
-                </li>
-              );})}
-            </ul>
-          </section>
+          <CategorySection key={c.id} c={c} type={type} onOpen={setOpen} innerRef={(el) => { sections.current[c.id] = el; }} />
         ))}
         {cats.length === 0 && <p className="py-10 text-center text-lenha-500">{q ? `Nada encontrado para “${q}”.` : 'Nenhum produto disponível no momento.'}</p>}
 
@@ -187,11 +156,86 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
       )}
 
       <ProductModal product={open} type={type} onClose={() => setOpen(null)} onAdd={(l) => setCart((c) => [...c, l])} />
-      {checkout && mode === 'online' && <Checkout slug={slug} data={data} type={type as any} cart={cart} setCart={setCart} invalid={invalid} onClose={() => setCheckout(false)} />}
+      {checkout && mode === 'online' && <Checkout slug={slug} data={data} type={type as any} setType={setType} cart={cart} setCart={setCart} invalid={invalid} onClose={() => setCheckout(false)} />}
       {checkout && mode !== 'online' && <InHouseCheckout slug={slug} token={token} mode={mode} accepting={!!accepting} cart={cart} setCart={setCart} invalid={invalid}
         onClose={() => setCheckout(false)} onSent={() => { fetchTable(); }} />}
       {comanda && table && <ComandaModal table={table} onClose={() => setComanda(false)} />}
     </div>
+  );
+}
+
+const prodMin = (p: any, type: string) => Math.min(...variantsFor(p, type).map((v: any) => v.price_cents));
+
+/** Categoria do cardápio: por padrão em carrossel horizontal; "Ver todos" abre a lista completa. */
+function CategorySection({ c, type, onOpen, innerRef }: { c: any; type: string; onOpen: (p: any) => void; innerRef: (el: HTMLElement | null) => void }) {
+  const [all, setAll] = useState(false);
+  const canExpand = c.products.length > 2;
+  return (
+    <section ref={innerRef} className="scroll-mt-16 pt-6">
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="font-slab text-2xl font-bold">{c.name}</h2>
+        {canExpand && (
+          <button onClick={() => setAll((v) => !v)} className="shrink-0 pb-1 text-sm font-semibold text-brasa-700 hover:underline">
+            {all ? 'Ver menos' : `Ver todos (${c.products.length})`}
+          </button>
+        )}
+      </div>
+      {all ? (
+        <ul className="mt-3 space-y-3">
+          {c.products.map((p: any) => <ProductRow key={p.id} p={p} type={type} onOpen={onOpen} />)}
+        </ul>
+      ) : (
+        <div className="no-scrollbar -mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2">
+          {c.products.map((p: any) => <ProductCard key={p.id} p={p} type={type} onOpen={onOpen} />)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Cartão do produto no carrossel (imagem em cima, preço embaixo). */
+function ProductCard({ p, type, onOpen }: { p: any; type: string; onOpen: (p: any) => void }) {
+  const multi = variantsFor(p, type).length > 1;
+  return (
+    <button onClick={() => onOpen(p)} className="w-44 shrink-0 snap-start overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-lenha-100 transition hover:-translate-y-0.5 hover:shadow-md sm:w-52">
+      <div className="relative h-32 w-full">
+        {p.image_url
+          ? <img src={p.image_url} alt="" loading="lazy" className="h-full w-full object-cover" />
+          : <div className="flex h-full w-full items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-brasa-400), var(--color-brasa-600))' }}><span className="font-slab text-4xl font-bold text-white/90">{p.name[0]}</span></div>}
+        <span className="absolute bottom-2 right-2 grid size-8 place-items-center rounded-full bg-brasa-500 text-lg font-bold leading-none text-white shadow-md" aria-hidden>+</span>
+      </div>
+      <div className="p-3">
+        <p className="line-clamp-1 font-semibold leading-tight">{p.name}</p>
+        {p.description && <p className="mt-0.5 line-clamp-2 text-xs text-lenha-500">{p.description}</p>}
+        <p className="mt-2 font-cond text-xl font-bold text-brasa-700 tabnums">
+          {multi ? <><span className="font-sans text-xs font-medium text-lenha-500">a partir de </span>{money(prodMin(p, type))}</> : priceLabel(p, type)}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+/** Linha do produto na lista completa (imagem ao lado). */
+function ProductRow({ p, type, onOpen }: { p: any; type: string; onOpen: (p: any) => void }) {
+  const multi = variantsFor(p, type).length > 1;
+  return (
+    <li>
+      <button onClick={() => onOpen(p)} className="flex w-full items-stretch gap-3 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-lenha-100 transition hover:ring-brasa-300">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="font-semibold leading-tight">{p.name}</span>
+          {p.description && <span className="mt-1 line-clamp-2 text-sm text-lenha-500">{p.description}</span>}
+          <span className="mt-auto pt-2 font-cond text-xl font-bold text-brasa-700 tabnums">
+            {multi ? <><span className="font-sans text-xs font-medium text-lenha-500">a partir de </span>{money(prodMin(p, type))}</> : priceLabel(p, type)}
+          </span>
+        </span>
+        <span className="relative size-24 shrink-0 self-center">
+          {p.image_url
+            ? <img src={p.image_url} alt="" loading="lazy" className="size-24 rounded-xl object-cover" />
+            : <span className="flex size-24 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, var(--color-brasa-400), var(--color-brasa-600))' }}><span className="font-slab text-3xl font-bold text-white/90">{p.name[0]}</span></span>}
+          <span className="absolute -bottom-2 -right-2 grid size-8 place-items-center rounded-full bg-brasa-500 text-lg font-bold leading-none text-white shadow-md" aria-hidden>+</span>
+        </span>
+      </button>
+    </li>
   );
 }
 
@@ -355,9 +399,10 @@ function InHouseCheckout({ slug, token, mode, accepting, cart, setCart, invalid,
   );
 }
 
-function Checkout({ slug, data, type, cart, setCart, invalid, onClose }: { slug: string; data: any; type: 'delivery' | 'retirada'; cart: CartLine[]; setCart: (f: any) => void; invalid: CartLine[]; onClose: () => void }) {
+function Checkout({ slug, data, type, setType, cart, setCart, invalid, onClose }: { slug: string; data: any; type: 'delivery' | 'retirada'; setType: (t: 'delivery' | 'retirada') => void; cart: CartLine[]; setCart: (f: any) => void; invalid: CartLine[]; onClose: () => void }) {
   const nav = useNavigate();
   const s = data.settings;
+  const bothTypes = s.accept_delivery && s.accept_pickup;
   const CK = `od_customer_${slug}`;
   const saved = load<any>(CK, {});
   const [f, setF] = useState({ name: saved.name || '', phone: saved.phone || '', street: saved.street || '', number: saved.number || '', complement: saved.complement || '',
@@ -405,6 +450,19 @@ function Checkout({ slug, data, type, cart, setCart, invalid, onClose }: { slug:
     <Modal open onClose={onClose} title="Seu pedido" wide
       footer={<div>{error && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-alerta" role="alert">{error}</p>}
         <Button size="lg" className="w-full" busy={busy} onClick={submit} disabled={!cart.length}>Enviar pedido · {money(subtotal + (fee || 0))}</Button></div>}>
+      {bothTypes && (
+        <div className="mb-4">
+          <p className="mb-2 text-sm font-semibold text-lenha-700">Como você quer receber?</p>
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-lenha-50 p-1" role="tablist" aria-label="Entrega ou retirada">
+            {(['delivery', 'retirada'] as const).map((t) => (
+              <button key={t} role="tab" aria-selected={type === t} onClick={() => setType(t)}
+                className={cx('h-11 rounded-lg font-semibold transition-colors', type === t ? 'bg-lenha-900 text-white' : 'text-lenha-700')}>
+                {t === 'delivery' ? 'Entrega' : 'Retirar no local'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <CartLines cart={cart} setCart={setCart} invalid={invalid} type={type} />
       <section className="mt-5 grid gap-3 sm:grid-cols-2">
         <Field label="Seu nome"><Input value={f.name} onChange={up('name')} autoComplete="name" /></Field>

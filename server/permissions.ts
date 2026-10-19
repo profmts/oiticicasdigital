@@ -69,7 +69,7 @@ export function effectivePermissions(role: Role, adjustments: { grant?: string[]
   return [...set];
 }
 
-/** Tela inicial de cada papel. */
+/** Tela inicial clássica de cada papel (usada como preferência quando ainda é acessível). */
 export const ROLE_HOME: Record<Role, string> = {
   admin: '/admin',
   gerente: '/admin',
@@ -78,3 +78,50 @@ export const ROLE_HOME: Record<Role, string> = {
   cozinha: '/cozinha',
   motoboy: '/motoboy',
 };
+
+/** Telas de equipe (fora do painel) por papel. */
+const TEAM_HOME: Partial<Record<Role, string>> = { garcom: '/garcom', cozinha: '/cozinha', motoboy: '/motoboy' };
+
+/**
+ * Permissões que, se concedidas, dão acesso ao painel administrativo (/admin).
+ * NÃO inclui as permissões próprias das telas de equipe (tables.use, kitchen.use, delivery.courier),
+ * para que um funcionário "puro" continue indo direto para a sua tela.
+ */
+export const ADMIN_ENTRY: Permission[] = [
+  'dashboard.view', 'orders.view', 'pdv.use', 'cash.operate', 'delivery.manage',
+  'products.manage', 'customers.view', 'finance.view', 'reports.view', 'users.manage',
+  'settings.manage', 'audit.view',
+];
+
+/** Ordem de preferência da tela inicial dentro do painel (primeira permissão que a pessoa tiver). */
+const HOME_PRIORITY: [Permission, string][] = [
+  ['dashboard.view', '/admin'],
+  ['pdv.use', '/admin/pdv'],
+  ['orders.view', '/admin/pedidos'],
+  ['cash.operate', '/admin/caixa'],
+  ['delivery.manage', '/admin/entregas'],
+  ['products.manage', '/admin/produtos'],
+  ['customers.view', '/admin/clientes'],
+  ['finance.view', '/admin/financeiro'],
+  ['reports.view', '/admin/relatorios'],
+  ['users.manage', '/admin/usuarios'],
+  ['settings.manage', '/admin/configuracoes'],
+  ['audit.view', '/admin/auditoria'],
+];
+
+/**
+ * Tela inicial efetiva a partir das permissões reais da pessoa.
+ * - Funcionário de equipe sem permissões de painel: vai para a tela de equipe.
+ * - Qualquer pessoa com permissão de painel: vai para a primeira tela disponível do painel,
+ *   mantendo o destino clássico do papel quando ele ainda for acessível (ex.: caixa -> PDV).
+ */
+export function homeFor(role: Role, permissions: Permission[]): string {
+  const hasPanel = permissions.some((p) => ADMIN_ENTRY.includes(p));
+  const team = TEAM_HOME[role];
+  if (team && !hasPanel) return team;
+  // Mantém o destino clássico do papel se a permissão correspondente existir.
+  const preferred = HOME_PRIORITY.find(([perm, route]) => route === ROLE_HOME[role] && permissions.includes(perm));
+  if (preferred) return preferred[1];
+  for (const [perm, route] of HOME_PRIORITY) if (permissions.includes(perm)) return route;
+  return team || '/admin';
+}

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { h, bad, HttpError, COOKIE, createSession, checkPassword, hashPassword, sha256, audit, requireAuth, cookieOpts, tenantBySlug, tenantActive, rateLimit, getSetting } from '../core.js';
 import { config } from '../config.js';
-import { ROLE_HOME, ROLE_LABELS, PERMISSIONS } from '../permissions.js';
+import { ROLE_LABELS, PERMISSIONS, homeFor, effectivePermissions } from '../permissions.js';
 
 export const authRouter = Router();
 const DUMMY_HASH = hashPassword('senha-inexistente'); // iguala o tempo de resposta para usuários inexistentes
@@ -51,7 +51,7 @@ authRouter.post('/login', h(async (req, res) => {
   const s = await createSession(req.db, 'tenant', u.id, req.headers['user-agent']);
   res.cookie(COOKIE, s.token, cookieOpts());
   await audit(req.db, { tenantId: t.id, userId: u.id, action: 'auth.login', entity: 'user', entityId: u.id, ip: req.ip });
-  return { ok: true, home: ROLE_HOME[u.role as keyof typeof ROLE_HOME] };
+  return { ok: true, home: homeFor(u.role, effectivePermissions(u.role, u.permissions || {})) };
 }));
 
 authRouter.post('/logout', h(async (req, res) => {
@@ -67,7 +67,7 @@ authRouter.get('/me', h(async (req) => {
   const t = req.tenant;
   return {
     ...base,
-    user: { ...req.user, role_label: ROLE_LABELS[req.user.role], home: ROLE_HOME[req.user.role] },
+    user: { ...req.user, role_label: ROLE_LABELS[req.user.role], home: homeFor(req.user.role, req.user.permissions) },
     tenant: { id: t.id, slug: t.slug, name: t.name, status: t.status, logo_url: logoUrl(t), plan: t.plan, trial_ends_at: t.trial_ends_at },
     permissions_catalog: PERMISSIONS,
   };

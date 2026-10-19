@@ -68,7 +68,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/garcom" element={<Guard perm="tables.use"><Waiter /></Guard>} />
               <Route path="/motoboy" element={<Guard perm="delivery.courier"><Courier /></Guard>} />
               <Route path="/imprimir/:id" element={<Guard><Receipt /></Guard>} />
-              <Route path="/admin" element={<Guard perm={['dashboard.view', 'orders.view', 'pdv.use', 'products.manage', 'cash.operate', 'finance.view', 'users.manage']}><AdminLayout /></Guard>}>
+              <Route path="/admin" element={<Guard perm={['dashboard.view', 'orders.view', 'pdv.use', 'cash.operate', 'delivery.manage', 'products.manage', 'customers.view', 'finance.view', 'reports.view', 'users.manage', 'settings.manage', 'audit.view']}><AdminLayout /></Guard>}>
                 <Route index element={<Guard perm="dashboard.view"><Dashboard /></Guard>} />
                 <Route path="pedidos" element={<Guard perm="orders.view"><Orders /></Guard>} />
                 <Route path="pdv" element={<Guard perm="pdv.use"><PDV /></Guard>} />
