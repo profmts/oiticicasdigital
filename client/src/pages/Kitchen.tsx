@@ -54,6 +54,7 @@ export default function Kitchen() {
           <button onClick={toggleSound} className={cx('h-11 rounded-xl px-3 font-semibold', sound ? 'bg-white/10' : 'bg-alerta')}>{sound ? 'Som ligado' : 'Som desligado'}</button>
           <span className={cx('size-3 rounded-full', online ? 'bg-green-400' : 'bg-red-500')} title={online ? 'Conectado' : 'Sem conexão — reconectando'} />
           <span className="hidden text-sm text-lenha-200 md:inline">{me?.name}</span>
+          {me?.home?.startsWith('/admin') && <a href={me.home} className="flex h-11 items-center gap-1 rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar ao painel administrativo"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Painel</a>}
           <button onClick={logout} className="h-11 rounded-xl px-3 text-sm hover:bg-white/10">Sair</button>
         </div>
       </header>

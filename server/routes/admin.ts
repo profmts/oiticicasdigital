@@ -5,6 +5,7 @@ import { ROLES, ROLE_LABELS, PERMISSIONS, ROLE_DEFAULTS, effectivePermissions } 
 import * as C from '../services/cash.js';
 import { dashboard, REPORTS, runReport, toCsv } from '../services/reports.js';
 import { planLimit } from './catalog.js';
+import { defaultSettings } from '../seed/catalog.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -230,6 +231,21 @@ adminRouter.put('/settings', requirePerm('settings.manage'), h(async (req) => {
   if (Object.keys(changed).length) await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'settings.update', data: changed, ip: req.ip });
   if (s.store_name) await req.db.run('UPDATE tenants SET name = $1, updated_at = NOW(3) WHERE id = $2', [s.store_name, T(req)]);
   broadcast(T(req), 'settings'); return getSettings(req.db, T(req));
+}));
+// Redefinir configurações para o padrão de fábrica. Reinicia os ajustes operacionais e visuais,
+// mas PRESERVA a identidade e o acesso da empresa (nome, contatos, endereço, fuso, PIN, chave Pix, loja aberta/fechada).
+// Não apaga nenhum dado (pedidos, clientes, produtos, caixa continuam intactos). Exige a senha do próprio administrador.
+const RESET_PRESERVE = ['store_name', 'slogan', 'whatsapp', 'whatsapp_display', 'address', 'city', 'instagram', 'timezone', 'is_open', 'team_pin', 'pix_key'];
+adminRouter.post('/settings/reset', requirePerm('settings.manage'), h(async (req) => {
+  const { password } = z.object({ password: z.string().optional() }).parse(req.body);
+  await confirmPassword(req, password);
+  const before = await getSettings(req.db, T(req));
+  const defaults = defaultSettings(String(before.store_name || req.tenant!.name));
+  const toApply = Object.fromEntries(Object.entries(defaults).filter(([k]) => !RESET_PRESERVE.includes(k)));
+  await req.db.tx(async (q) => { for (const [k, v] of Object.entries(toApply)) await setSetting(q, T(req), k, v); });
+  await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'settings.reset', data: { keys: Object.keys(toApply) }, ip: req.ip });
+  broadcast(T(req), 'settings');
+  return getSettings(req.db, T(req));
 }));
 adminRouter.post('/logo', requirePerm('settings.manage'), h(async (req) => {
   const { file_id } = z.object({ file_id: z.number().int().nullable() }).parse(req.body);

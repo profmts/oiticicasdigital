@@ -8,7 +8,7 @@ const LABEL: Record<string, string> = {
   'user.password_change': 'Trocou a própria senha', 'order.cancel': 'Cancelou pedido', 'item.cancel': 'Cancelou item', 'order.discount': 'Concedeu desconto', 'payment.void': 'Estornou pagamento',
   'order.receivable': 'Concluiu com saldo em aberto', 'order.delivery_fee': 'Alterou taxa de entrega', 'cash.open': 'Abriu caixa', 'cash.close': 'Fechou caixa', 'cash.sangria': 'Sangria', 'cash.suprimento': 'Suprimento',
   'cash.settle_courier': 'Acerto de motoboy', 'product.create': 'Criou produto', 'product.update': 'Alterou produto', 'product.pause': 'Pausou produto', 'product.resume': 'Reativou produto',
-  'category.create': 'Criou categoria', 'category.update': 'Alterou categoria', 'settings.update': 'Alterou configurações', 'store.open': 'Abriu a loja', 'store.close': 'Fechou a loja',
+  'category.create': 'Criou categoria', 'category.update': 'Alterou categoria', 'settings.update': 'Alterou configurações', 'settings.reset': 'Redefiniu configurações (padrão de fábrica)', 'settings.logo': 'Trocou a logo', 'store.open': 'Abriu a loja', 'store.close': 'Fechou a loja',
   'expense.create': 'Lançou despesa', 'expense.update': 'Alterou despesa', 'expense.pay': 'Pagou despesa', 'expense.cancel': 'Cancelou despesa', 'table.transfer': 'Transferiu mesa',
   'zone.create': 'Criou bairro', 'zone.update': 'Alterou bairro', 'backup.create': 'Gerou backup',
 };

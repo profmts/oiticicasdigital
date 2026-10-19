@@ -73,6 +73,13 @@ img { max-width: 100%; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
+/* Barra de rolagem horizontal sempre visível (ex.: Kanban de pedidos), para facilitar o acesso lateral. */
+.kanban-scroll { scrollbar-width: auto; scrollbar-color: var(--color-brasa-400, #5b8cff) var(--color-lenha-100, #e3e9f2); }
+.kanban-scroll::-webkit-scrollbar { height: 12px; }
+.kanban-scroll::-webkit-scrollbar-track { background: var(--color-lenha-100, #e3e9f2); border-radius: 999px; }
+.kanban-scroll::-webkit-scrollbar-thumb { background: var(--color-brasa-400, #5b8cff); border-radius: 999px; border: 3px solid var(--color-lenha-100, #e3e9f2); }
+.kanban-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-brasa-500, #2f6bff); }
+
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgb(47 107 255 / .55); } 100% { box-shadow: 0 0 0 14px rgb(47 107 255 / 0); } }
 .pulse-new { animation: pulse-ring 1.4s ease-out 3; }
 @keyframes blink-call { 50% { opacity: .55; } }

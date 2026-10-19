@@ -55,7 +55,7 @@ export default function Orders() {
         <span className="text-sm text-lenha-500">Arraste o cartão para mudar a etapa, ou abra o pedido. Alerta após {alertMin} min.</span>
         <SearchBox onOpen={setOpen} />
       </div>
-      <div className="no-scrollbar -mx-3 flex gap-3 overflow-x-auto px-3 pb-4 sm:-mx-5 sm:px-5">
+      <div className="kanban-scroll -mx-3 flex gap-3 overflow-x-auto px-3 pb-3 sm:-mx-5 sm:px-5">
         {cols.map((c) => {
           const items = list.filter(c.match).sort((a, b) => b.priority - a.priority || (['concluido', 'cancelado'].includes(c.id) ? b.updated_at.localeCompare(a.updated_at) : a.created_at.localeCompare(b.created_at)));
           const canDrop = dragging && c.drop && c.drop !== dragging.status && dragging.type !== 'mesa';

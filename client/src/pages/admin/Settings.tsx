@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, post, put } from '../../lib/api';
 import { useData } from '../../lib/hooks';
 import { money, parseMoney, centsToInput } from '../../lib/format';
-import { Button, Field, Input, MoneyInput, Select, Spinner, Textarea, Toggle, useAction, cx } from '../../components/ui';
+import { Button, Field, Input, Modal, MoneyInput, Select, Spinner, Textarea, Toggle, useAction, cx } from '../../components/ui';
 import { useAuth } from '../../lib/hooks';
 import { tenantTheme } from '../../lib/theme';
 import { TenantLogo } from '../../components/brand';
@@ -15,23 +15,47 @@ const Section = ({ title, desc, children }: { title: string; desc?: string; chil
   </section>
 );
 
+// Todas as chaves de configuração editadas nesta tela (salvas de uma vez pelo botão geral).
+// is_open fica de fora: é controlada pelo botão Abrir/Fechar loja no topo do painel.
+const ALL_KEYS = [
+  'store_name', 'slogan', 'whatsapp', 'whatsapp_display', 'address', 'city', 'instagram', 'timezone',
+  'closed_message', 'accept_delivery', 'accept_pickup', 'allow_unlisted_neighborhood', 'min_order_cents',
+  'delivery_estimate_minutes', 'pickup_estimate_minutes', 'prep_alert_minutes', 'payment_methods', 'pix_key',
+  'banners', 'kitchen_sectors', 'self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled',
+  'hide_table_13', 'team_pin', 'brand_color', 'brand_dark', 'menu_font',
+];
+
 export default function Settings() {
-  const { data, reload } = useData<any>('/api/admin/settings', [], 0);
+  const { data, reload } = useData<any>('/api/admin/settings', ['settings'], 0);
   const [s, setS] = useState<any>(null);
   const { run, busy } = useAction();
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPw, setResetPw] = useState('');
   useEffect(() => { if (data) setS({ ...data, min_order: centsToInput(data.min_order_cents || 0) }); }, [data]);
   if (!s) return <Spinner />;
   const set = (k: string, v: any) => setS((x: any) => ({ ...x, [k]: v }));
-  const save = (keys: string[]) => {
-    const body: any = Object.fromEntries(keys.map((k) => [k, s[k]]));
-    if (keys.includes('min_order_cents')) body.min_order_cents = parseMoney(s.min_order || '0') || 0;
-    return run('save', () => put('/api/admin/settings', body).then(reload), 'Configurações salvas.');
-  };
-  const SaveBtn = ({ keys }: { keys: string[] }) => <Button className="mt-4" busy={busy === 'save'} onClick={() => save(keys)}>Salvar</Button>;
   const num = (v: string) => (v === '' ? null : Number(v.replace(/\D/g, '')) || null);
 
+  // Monta o corpo com todas as chaves, convertendo o pedido mínimo para centavos.
+  const buildBody = () => {
+    const body: any = Object.fromEntries(ALL_KEYS.map((k) => [k, s[k]]));
+    body.min_order_cents = parseMoney(s.min_order || '0') || 0;
+    return body;
+  };
+  const dirty = !!data && ALL_KEYS.some((k) => {
+    const v = k === 'min_order_cents' ? (parseMoney(s.min_order || '0') || 0) : s[k];
+    return JSON.stringify(v) !== JSON.stringify(data[k]);
+  });
+  const saveAll = () => run('save', () => put('/api/admin/settings', buildBody()).then(reload), 'Configurações salvas.');
+  const doReset = () => run('reset', async () => {
+    const r = await post('/api/admin/settings/reset', { password: resetPw });
+    setS({ ...r, min_order: centsToInput(r.min_order_cents || 0) });
+    await reload();
+    setResetOpen(false); setResetPw('');
+  }, 'Configurações redefinidas para o padrão de fábrica.');
+
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-4xl space-y-4 pb-24">
       <Section title="Estabelecimento">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Nome"><Input value={s.store_name} onChange={(e) => set('store_name', e.target.value)} /></Field>
@@ -44,10 +68,9 @@ export default function Settings() {
           <Field label="Fuso horário (relatórios)"><Select value={s.timezone || 'America/Fortaleza'} onChange={(e) => set('timezone', e.target.value)}>
             {['America/Fortaleza', 'America/Recife', 'America/Bahia', 'America/Sao_Paulo', 'America/Belem', 'America/Manaus', 'America/Cuiaba', 'America/Porto_Velho', 'America/Rio_Branco', 'America/Noronha'].map((z) => <option key={z}>{z}</option>)}</Select></Field>
         </div>
-        <SaveBtn keys={['store_name', 'slogan', 'whatsapp', 'whatsapp_display', 'address', 'city', 'instagram', 'timezone']} />
       </Section>
 
-      <Branding s={s} set={set} save={save} busy={busy} />
+      <Branding s={s} set={set} busy={busy} />
 
       <Section title="Pedido presencial pelo QR Code" desc="Os QR Codes das mesas e do balcão ficam no menu QR Codes.">
         <div className="space-y-3">
@@ -56,19 +79,16 @@ export default function Settings() {
           <Toggle checked={!!s.self_order_counter_enabled} onChange={(v) => set('self_order_counter_enabled', v)} label="QR do balcão: cliente pede e retira no balcão (equipe confirma)" />
           <p className="text-sm text-lenha-600">Recomendado: deixar a confirmação do garçom ligada no começo, para evitar pedidos feitos por quem não está na mesa.</p>
         </div>
-        <SaveBtn keys={['self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled']} />
       </Section>
 
       <Section title="Mesas" desc="Ajustes das mesas do salão.">
         <Toggle checked={!!s.hide_table_13} onChange={(v) => set('hide_table_13', v)} label="Ocultar a mesa 13 (pula o número 13 no salão e no QR, sem apagar a mesa)" />
-        <SaveBtn keys={['hide_table_13']} />
       </Section>
 
       <Section title="Acesso da equipe por PIN" desc="Com um PIN definido, a tela de acesso mostra os perfis da equipe para escolher e pedir só a senha. Deixe em branco para manter o login tradicional (usuário e senha digitados).">
         <Field label="PIN da loja (somente números, 4 a 8 dígitos)" hint="O aparelho lembra o PIN depois da primeira vez. Compartilhe só com a equipe.">
           <Input value={s.team_pin || ''} inputMode="numeric" maxLength={8} placeholder="ex.: 2468" onChange={(e) => set('team_pin', e.target.value.replace(/\D/g, ''))} className="w-40" />
         </Field>
-        <SaveBtn keys={['team_pin']} />
       </Section>
 
       <Section title="Funcionamento e pedidos online" desc="Abra e feche a loja pelo botão no topo do painel. Tempos estimados e pedido mínimo só aparecem para o cliente quando preenchidos.">
@@ -83,7 +103,6 @@ export default function Settings() {
           </div>
           <Field label="Mensagem quando fechado"><Input value={s.closed_message} onChange={(e) => set('closed_message', e.target.value)} /></Field>
         </div>
-        <SaveBtn keys={['accept_delivery', 'accept_pickup', 'allow_unlisted_neighborhood', 'min_order_cents', 'delivery_estimate_minutes', 'pickup_estimate_minutes', 'closed_message']} />
       </Section>
 
       <Zones />
@@ -100,7 +119,6 @@ export default function Settings() {
         </ul>
         <Button variant="ghost" size="sm" className="mt-2" onClick={() => { const name = prompt('Nome da forma de pagamento (ex.: Vale-refeição)'); if (name) set('payment_methods', [...s.payment_methods, { id: name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 30), name, active: true, online: false }]); }}>+ Outra forma</Button>
         <Field label="Chave Pix (mostrada ao cliente que escolher Pix)" className="mt-3"><Input value={s.pix_key} onChange={(e) => set('pix_key', e.target.value)} /></Field>
-        <SaveBtn keys={['payment_methods', 'pix_key']} />
       </Section>
 
       <Section title="Cozinha">
@@ -108,7 +126,6 @@ export default function Settings() {
           <Field label="Alerta de atraso (minutos)" hint="Pedidos acima deste tempo ficam em vermelho no Kanban e na cozinha."><Input inputMode="numeric" value={s.prep_alert_minutes} onChange={(e) => set('prep_alert_minutes', Number(e.target.value.replace(/\D/g, '')) || 1)} /></Field>
           <Field label="Setores de preparo" hint="Separados por vírgula. Ex.: espetos, porcoes, bebidas"><Input value={s.kitchen_sectors.join(', ')} onChange={(e) => set('kitchen_sectors', e.target.value.split(',').map((x: string) => x.trim()).filter(Boolean))} /></Field>
         </div>
-        <SaveBtn keys={['prep_alert_minutes', 'kitchen_sectors']} />
       </Section>
 
       <Section title="Banners do cardápio" desc="Destaques rotativos no topo do cardápio. “Categoria” leva o cliente até ela ao tocar.">
@@ -123,10 +140,32 @@ export default function Settings() {
           ))}
           {s.banners.length < 8 && <Button variant="ghost" size="sm" onClick={() => set('banners', [...s.banners, { title: '', subtitle: '', category: '' }])}>+ Banner</Button>}
         </div>
-        <SaveBtn keys={['banners']} />
       </Section>
 
       <BackupSection />
+
+      <Section title="Redefinir configurações" desc="Volta os ajustes de funcionamento, pagamentos, cozinha, banners e identidade visual para o padrão de fábrica. Mantém o nome, contatos, endereço, fuso, PIN e chave Pix da empresa. NÃO apaga pedidos, clientes, produtos nem caixa.">
+        <Button variant="outline" onClick={() => { setResetPw(''); setResetOpen(true); }}>Redefinir para padrão de fábrica</Button>
+      </Section>
+
+      {/* Barra fixa: salvar tudo de uma vez, com aviso de alterações não salvas. */}
+      <div className="no-print sticky bottom-0 z-10 -mx-3 border-t border-lenha-100 bg-papel/95 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+        <div className="mx-auto flex max-w-4xl items-center gap-3">
+          <span className={cx('text-sm font-semibold', dirty ? 'text-brasa-700' : 'text-lenha-500')}>
+            {dirty ? '● Você tem alterações não salvas.' : 'Tudo salvo.'}
+          </span>
+          <Button className="ml-auto" busy={busy === 'save'} disabled={!dirty} onClick={saveAll}>Salvar todas as alterações</Button>
+        </div>
+      </div>
+
+      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title="Redefinir para o padrão de fábrica"
+        footer={<div className="flex gap-2"><Button variant="outline" className="flex-1" onClick={() => setResetOpen(false)}>Cancelar</Button><Button className="flex-1" busy={busy === 'reset'} disabled={!resetPw} onClick={doReset}>Redefinir</Button></div>}>
+        <p className="mb-3 text-sm text-lenha-700">Os ajustes de funcionamento, pagamentos, cozinha, banners e identidade visual voltam ao padrão. Nome, contatos, endereço, fuso, PIN e chave Pix são mantidos. Nenhum pedido, cliente, produto ou caixa é apagado.</p>
+        <form onSubmit={(e) => { e.preventDefault(); if (resetPw) doReset(); }}>
+          <Field label="Confirme com a sua senha"><Input type="password" value={resetPw} onChange={(e) => setResetPw(e.target.value)} autoComplete="current-password" autoFocus /></Field>
+          <button type="submit" hidden />
+        </form>
+      </Modal>
     </div>
   );
 }
@@ -136,7 +175,7 @@ function Zones() {
   const [n, setN] = useState({ name: '', fee: '', min: '', eta: '' });
   const { run, busy } = useAction();
   return (
-    <Section title="Bairros e taxas de entrega" desc="Cadastre os bairros atendidos com a taxa de cada um. Nenhuma taxa é cobrada automaticamente sem estar cadastrada aqui.">
+    <Section title="Bairros e taxas de entrega" desc="Cadastre os bairros atendidos com a taxa de cada um. Nenhuma taxa é cobrada automaticamente sem estar cadastrada aqui. Os bairros são salvos na hora, sem depender do botão geral.">
       {zones.data?.length === 0 && <p className="mb-3 rounded-lg bg-ouro-300/40 px-3 py-2 text-sm">Nenhum bairro cadastrado: pedidos de entrega ficam com a taxa “a confirmar”, definida na confirmação.</p>}
       <ul className="divide-y divide-lenha-100">
         {zones.data?.map((z) => (
@@ -167,7 +206,23 @@ function BackupSection() {
   );
 }
 
-function Branding({ s, set, save, busy }: { s: any; set: (k: string, v: any) => void; save: (keys: string[]) => any; busy: string | null }) {
+// Caixa de cor: um quadrado grande e clicável, sem precisar digitar o código.
+function ColorBox({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <Field label={label}>
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-lenha-200 bg-white p-2 hover:border-brasa-400">
+        <span className="size-12 shrink-0 rounded-lg ring-1 ring-lenha-200" style={{ backgroundColor: value }} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Toque para escolher a cor</span>
+          <span className="block text-xs uppercase tracking-wide text-lenha-500">{value}</span>
+        </span>
+        <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="size-10 shrink-0 cursor-pointer rounded-lg border border-lenha-200 bg-white" aria-label={label} />
+      </label>
+    </Field>
+  );
+}
+
+function Branding({ s, set, busy }: { s: any; set: (k: string, v: any) => void; busy: string | null }) {
   const { tenant, refresh } = useAuth();
   const { run } = useAction();
   const upload = async (file: File) => {
@@ -184,11 +239,11 @@ function Branding({ s, set, save, busy }: { s: any; set: (k: string, v: any) => 
               <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Cor principal"><div className="flex gap-2"><input type="color" value={s.brand_color} onChange={(e) => set('brand_color', e.target.value)} className="h-11 w-14 rounded-lg border border-lenha-200" aria-label="Cor principal" /><Input value={s.brand_color} onChange={(e) => set('brand_color', e.target.value)} /></div></Field>
-            <Field label="Cor escura (fundos e textos)"><div className="flex gap-2"><input type="color" value={s.brand_dark} onChange={(e) => set('brand_dark', e.target.value)} className="h-11 w-14 rounded-lg border border-lenha-200" aria-label="Cor escura" /><Input value={s.brand_dark} onChange={(e) => set('brand_dark', e.target.value)} /></div></Field>
+            <ColorBox label="Cor principal" value={s.brand_color} onChange={(v) => set('brand_color', v)} />
+            <ColorBox label="Cor escura (fundos e textos)" value={s.brand_dark} onChange={(v) => set('brand_dark', v)} />
             <Field label="Estilo dos títulos"><Select value={s.menu_font} onChange={(e) => set('menu_font', e.target.value)}><option value="modern">Moderno</option><option value="slab">Clássico (serifado)</option></Select></Field>
           </div>
-          <Button busy={busy === 'save'} onClick={() => save(['brand_color', 'brand_dark', 'menu_font'])}>Salvar identidade</Button>
+          <p className="text-sm text-lenha-500">As cores e a logo valem assim que você salvar as alterações.</p>
         </div>
         <div style={tenantTheme(s)} className="overflow-hidden rounded-2xl ring-1 ring-lenha-100" aria-label="Prévia">
           <div className="bg-lenha-900 p-4 text-center"><TenantLogo url={tenant?.logo_url} name={s.store_name} className="mx-auto size-16 rounded-xl bg-white object-contain" /><p className="mt-2 font-slab font-bold text-white">{s.slogan || s.store_name}</p></div>

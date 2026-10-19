@@ -459,3 +459,37 @@ test('28 M3: reiniciar empresa apaga dados e auditoria, mantém cardápio e deix
   const nc = new Client(); await nc.login('novoadm', 'senhaForte123', 'reset-teste');
   assert.equal(ok(await nc.get('/api/auth/me')).user.role, 'admin', 'novo admin entra');
 });
+
+test('29 permissões extras levam o funcionário ao painel (home dinâmica)', async () => {
+  // motoboy puro: vai para a própria tela
+  const id = ok(await admin.post('/api/admin/users', { name: 'Moto Full', username: 'motofull', role: 'motoboy', password: 'senha123' })).id;
+  const c = new Client(); await c.login('motofull');
+  assert.equal(ok(await c.get('/api/auth/me')).user.home, '/motoboy', 'motoboy sem extras vai para /motoboy');
+  // ao conceder delivery.manage, passa a cair no painel de entregas
+  ok(await admin.put(`/api/admin/users/${id}`, { name: 'Moto Full', username: 'motofull', role: 'motoboy', phone: '', active: true, permissions: { grant: ['delivery.manage'], revoke: [] } }));
+  const me = ok(await c.get('/api/auth/me')).user;
+  assert.equal(me.home, '/admin/entregas', 'com delivery.manage vai para o painel de entregas');
+  assert.ok(me.permissions.includes('delivery.manage'), 'permissão concedida vale');
+  assert.equal((await c.get('/api/couriers')).status, 200, 'acessa a área de entregas concedida');
+  assert.equal((await c.get('/api/admin/users')).status, 403, 'segue sem acesso a áreas não concedidas');
+  // garçom puro continua indo para a tela do garçom
+  assert.equal(ok(await garcom2.get('/api/auth/me')).user.home, '/garcom', 'garçom sem extras vai para /garcom');
+  // caixa mantém o PDV como tela inicial
+  assert.equal(ok(await caixa.get('/api/auth/me')).user.home, '/admin/pdv', 'caixa cai no PDV');
+});
+
+test('30 redefinir configurações para o padrão de fábrica (preserva identidade)', async () => {
+  const r = ok(await plat.post('/api/platform/tenants', { name: 'Fabrica Teste', slug: 'fabrica-teste', admin: { name: 'Dono F', username: 'donof', password: 'senhaForte123' }, tables: 2 }));
+  const c = new Client(); await c.login('donof', 'senhaForte123', 'fabrica-teste');
+  ok(await c.put('/api/admin/settings', { store_name: 'Fabrica Teste', brand_color: '#123456', menu_font: 'slab', closed_message: 'Mensagem personalizada', team_pin: '1357', pix_key: 'chave-pix-dono' }));
+  assert.equal((await c.post('/api/admin/settings/reset', {})).status, 403, 'sem senha é recusado');
+  assert.equal((await c.post('/api/admin/settings/reset', { password: 'errada' })).status, 403, 'senha errada é recusada');
+  const after = ok(await c.post('/api/admin/settings/reset', { password: 'senhaForte123' }));
+  assert.equal(after.brand_color, '#2563eb', 'cor volta ao padrão');
+  assert.equal(after.menu_font, 'modern', 'fonte volta ao padrão');
+  assert.equal(after.closed_message, 'Estamos fechados no momento. Volte mais tarde!', 'mensagem volta ao padrão');
+  assert.equal(after.store_name, 'Fabrica Teste', 'nome preservado');
+  assert.equal(after.team_pin, '1357', 'PIN preservado');
+  assert.equal(after.pix_key, 'chave-pix-dono', 'chave Pix preservada');
+  assert.ok(await db.get("SELECT 1 FROM audit_log WHERE action = 'settings.reset' AND tenant_id = $1", [r.id]), 'reinício fica na auditoria');
+});
