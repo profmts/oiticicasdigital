@@ -26,7 +26,7 @@ export default function Audit() {
         </Select>
       </div>
       {!data ? <Spinner /> : (
-        <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-lenha-100">
+        <div className="scroll-visible overflow-x-auto rounded-2xl bg-white ring-1 ring-lenha-100">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-lenha-500"><th className="px-4 py-2">Quando</th><th>Quem</th><th>Ação</th><th>Detalhes</th></tr></thead>
             <tbody>

@@ -54,7 +54,7 @@ publicRouter.get('/:slug/menu', h(async (req) => {
 const itemsSchema = z.array(z.object({ variant_id: z.number().int(), qty: z.number().int().min(1).max(99), option_ids: z.array(z.number().int()).max(20).optional(), notes: z.string().max(200).optional() })).min(1).max(60);
 const publicOrderSchema = z.object({
   idempotency_key: z.string().min(8).max(80), type: z.enum(['delivery', 'retirada', 'balcao']), items: itemsSchema,
-  customer_name: z.string().max(80), customer_phone: z.string().max(25).optional().default(''),
+  customer_name: z.string().max(80), customer_phone: z.string().max(25).optional().default(''), customer_cpf: z.string().max(14).optional(),
   address: z.object({ street: z.string().max(120).optional(), number: z.string().max(20).optional(), complement: z.string().max(80).optional(), neighborhood: z.string().max(80).optional(), reference: z.string().max(120).optional() }).optional(),
   delivery_zone_id: z.number().int().nullable().optional(), payment_hint: z.string().max(40).optional(), change_for_cents: z.number().int().min(0).max(1000000).nullable().optional(),
   notes: z.string().max(300).optional(), save_address: z.boolean().optional(),

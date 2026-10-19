@@ -80,6 +80,14 @@ img { max-width: 100%; }
 .kanban-scroll::-webkit-scrollbar-thumb { background: var(--color-brasa-400, #5b8cff); border-radius: 999px; border: 3px solid var(--color-lenha-100, #e3e9f2); }
 .kanban-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-brasa-500, #2f6bff); }
 
+/* Barra de rolagem sempre visível (vertical e horizontal) em janelas e áreas com muita informação.
+   Em alguns sistemas a barra fica escondida (overlay) e só aparece ao rolar; aqui ela fica sempre à mostra. */
+.scroll-visible { scrollbar-width: thin; scrollbar-color: var(--color-lenha-300, #98a6bd) transparent; }
+.scroll-visible::-webkit-scrollbar { width: 10px; height: 10px; }
+.scroll-visible::-webkit-scrollbar-track { background: transparent; }
+.scroll-visible::-webkit-scrollbar-thumb { background: var(--color-lenha-300, #98a6bd); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+.scroll-visible::-webkit-scrollbar-thumb:hover { background: var(--color-lenha-500, #5b6b85); background-clip: padding-box; }
+
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgb(47 107 255 / .55); } 100% { box-shadow: 0 0 0 14px rgb(47 107 255 / 0); } }
 .pulse-new { animation: pulse-ring 1.4s ease-out 3; }
 @keyframes blink-call { 50% { opacity: .55; } }

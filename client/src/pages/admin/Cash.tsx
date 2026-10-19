@@ -98,7 +98,7 @@ export default function Cash() {
       {sessions.data && (
         <section className="rounded-2xl bg-white p-4 ring-1 ring-lenha-100">
           <h2 className="mb-2 font-slab text-lg font-bold">Histórico de caixas</h2>
-          <div className="overflow-x-auto">
+          <div className="scroll-visible overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-lenha-500"><th className="py-1">Operador</th><th>Abertura</th><th>Fechamento</th><th className="text-right">Esperado</th><th className="text-right">Contado</th><th className="text-right">Diferença</th><th /></tr></thead>
               <tbody>

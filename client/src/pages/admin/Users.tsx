@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { post, put, del } from '../../lib/api';
 import { useAuth, useData } from '../../lib/hooks';
-import { Badge, Button, Field, Input, Modal, Select, Spinner, Toggle, useAction, cx } from '../../components/ui';
+import { Badge, Button, Field, Input, Modal, Select, PhoneInput, Spinner, Toggle, useAction, cx } from '../../components/ui';
 
 /** M2: remover (excluir) um membro da equipe, com a confirmação da senha do administrador. */
 function RemoverUsuario({ alvo, onClose, onDone }: { alvo: any; onClose: () => void; onDone: () => void }) {
@@ -67,7 +67,7 @@ function UserEditor({ initial, meta, self, onClose, onSaved }: { initial: any; m
         <Field label="Nome"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
         <Field label="Usuário (login)"><Input value={f.username} autoCapitalize="none" onChange={(e) => setF({ ...f, username: e.target.value.replace(/\s/g, '') })} /></Field>
         <Field label="Função"><Select value={f.role} disabled={self} onChange={(e) => setF({ ...f, role: e.target.value, permissions: { grant: [], revoke: [] } })}>{meta.roles.map((r: any) => <option key={r.id} value={r.id}>{r.label}</option>)}</Select></Field>
-        <Field label="Telefone"><Input value={f.phone || ''} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
+        <Field label="Telefone"><PhoneInput value={f.phone || ''} onChange={(v) => setF({ ...f, phone: v })} /></Field>
         <Field label={f.id ? 'Nova senha (deixe vazio para manter)' : 'Senha inicial'} hint="Mínimo de 6 caracteres. Ao trocar, a pessoa é desconectada dos aparelhos."><Input type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
         <div className="flex items-end pb-2"><Toggle checked={f.active} disabled={self} onChange={(v) => setF({ ...f, active: v })} label="Acesso ativo" /></div>
       </div>

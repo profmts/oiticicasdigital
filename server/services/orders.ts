@@ -121,7 +121,7 @@ async function nextNumber(q: Q, t: number) {
 
 export interface CreateOrderInput {
   channel: Channel; type: OrderType; items: ItemInput[]; idempotency_key?: string;
-  customer_name?: string; customer_phone?: string; save_address?: boolean;
+  customer_name?: string; customer_phone?: string; customer_cpf?: string; save_address?: boolean;
   address?: { street?: string; number?: string; complement?: string; neighborhood?: string; reference?: string };
   delivery_zone_id?: number | null; payment_hint?: string; change_for_cents?: number | null; notes?: string;
   table_id?: number; guests?: number; send_to_kitchen?: boolean; delivery_fee_cents?: number | null;
@@ -149,6 +149,8 @@ export async function createOrder(db: DB, t: number, input: CreateOrderInput, us
       const subtotal = items.reduce((s, i) => s + i.total_cents, 0);
 
       const phone = digits(input.customer_phone);
+      const cpfDigits = digits(input.customer_cpf);
+      const cpf = cpfDigits.length === 11 ? cpfDigits : null; // opcional; só guarda se vier completo
       const name = String(input.customer_name || '').trim().slice(0, 80);
       if (online && name.length < 2) throw bad('Informe seu nome.');
       if (input.channel === 'cardapio' || type === 'delivery') {
@@ -189,8 +191,8 @@ export async function createOrder(db: DB, t: number, input: CreateOrderInput, us
 
       let customerId: number | null = null;
       if (phone.length >= 10) {
-        const c = await q.run(`INSERT INTO customers (tenant_id, name, phone, save_address) VALUES ($1,$2,$3,$4)
-          ON DUPLICATE KEY UPDATE name = IF(VALUES(name) = '', name, VALUES(name)), id = LAST_INSERT_ID(id)`, [t, name || '', phone, !!input.save_address]);
+        const c = await q.run(`INSERT INTO customers (tenant_id, name, phone, cpf, save_address) VALUES ($1,$2,$3,$4,$5)
+          ON DUPLICATE KEY UPDATE name = IF(VALUES(name) = '', name, VALUES(name)), cpf = COALESCE(VALUES(cpf), cpf), id = LAST_INSERT_ID(id)`, [t, name || '', phone, cpf, !!input.save_address]);
         customerId = c.insertId;
         if (input.save_address && address) {
           await q.run('UPDATE customers SET save_address = true WHERE id = $1', [customerId]);

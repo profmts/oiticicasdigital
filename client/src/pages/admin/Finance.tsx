@@ -27,7 +27,7 @@ export default function Finance() {
       </div>
       <p className="mb-3 text-sm text-lenha-600">As despesas entram no dashboard e no fluxo de caixa. Contas a receber (saldos de pedidos em aberto) e o fluxo de caixa diário estão em Relatórios.</p>
       {!data ? <Spinner /> : data.length === 0 ? <p className="py-10 text-center text-lenha-500">Nenhuma despesa {status === 'pendente' ? 'pendente' : 'neste filtro'}.</p> : (
-        <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-lenha-100">
+        <div className="scroll-visible overflow-x-auto rounded-2xl bg-white ring-1 ring-lenha-100">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-lenha-500"><th className="px-4 py-2">Vencimento</th><th>Descrição</th><th>Categoria</th><th>Fornecedor</th><th className="text-right">Valor</th><th className="px-4">Situação</th><th /></tr></thead>
             <tbody>

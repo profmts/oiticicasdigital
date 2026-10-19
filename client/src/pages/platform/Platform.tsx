@@ -361,7 +361,7 @@ export function PlatformAudit() {
   return (
     <div>
       <h1 className="mb-4 font-slab text-2xl font-bold">Auditoria da plataforma</h1>
-      <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-lenha-100">
+      <div className="scroll-visible overflow-x-auto rounded-2xl bg-white ring-1 ring-lenha-100">
         <table className="w-full text-sm">
           <thead><tr className="text-left text-lenha-500"><th className="px-4 py-2">Quando</th><th>Quem</th><th>Ação</th><th>Empresa</th><th className="px-4">Detalhes</th></tr></thead>
           <tbody>{list.map((a) => (

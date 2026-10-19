@@ -32,7 +32,7 @@ export default function Courier() {
         <TenantLogo url={tenant?.logo_url} name={tenant?.name || ''} className="size-10 rounded-lg bg-white object-contain text-xs" />
         <div className="leading-tight"><p className="font-slab text-lg font-bold">Minhas entregas</p><p className="text-sm text-lenha-200">{me?.name}</p></div>
         <span className={cx('ml-auto size-2.5 rounded-full', online ? 'bg-green-400' : 'bg-red-400')} />
-        {me?.home?.startsWith('/admin') && <a href={me.home} className="flex h-9 items-center gap-1 rounded-full bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar ao painel administrativo"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Painel</a>}
+        {me?.home?.startsWith('/admin') && <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = me.home))} className="flex h-9 items-center gap-1 rounded-full bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar à tela anterior"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Voltar</button>}
         <button onClick={logout} className="h-9 rounded-full px-3 text-sm font-semibold hover:bg-white/10">Sair</button>
       </header>
       <main className="mx-auto max-w-lg space-y-4 p-3">

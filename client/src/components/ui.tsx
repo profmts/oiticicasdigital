@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { setAuthAsker, ApiError } from '../lib/api';
+import { maskCents, maskPhone, maskCpf } from '../lib/format';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 export { cx };
@@ -78,7 +79,7 @@ export function Modal({ open, onClose, title, children, footer, wide, side }: { 
           <h2 className="font-slab text-xl font-bold leading-tight">{title}</h2>
           <button onClick={onClose} className="grid size-9 place-items-center rounded-full text-2xl leading-none text-lenha-500 hover:bg-lenha-100" aria-label="Fechar">×</button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="scroll-visible flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && <div className="border-t border-lenha-100 px-5 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
       </div>
     </div>
@@ -152,12 +153,23 @@ export function useAction() {
 }
 
 export function MoneyInput({ value, onChange, ...p }: { value: string; onChange: (v: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  // Máscara de centavos: digita só números e o valor se forma da direita (centavos, reais, milhares).
   return (
     <div className="relative">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lenha-500">R$</span>
-      <Input inputMode="decimal" {...p} value={value} onChange={(e) => onChange(e.target.value.replace(/[^\d,.]/g, ''))} className={cx('pl-10 tabnums', p.className)} />
+      <Input inputMode="numeric" {...p} value={value} onChange={(e) => onChange(maskCents(e.target.value))} className={cx('pl-10 tabnums', p.className)} />
     </div>
   );
+}
+
+/** Campo de telefone com máscara (83) 99999-9999 enquanto digita. O valor guardado é o texto com máscara. */
+export function PhoneInput({ value, onChange, ...p }: { value: string; onChange: (v: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  return <Input inputMode="tel" autoComplete="tel" placeholder="(83) 99999-9999" {...p} value={value} onChange={(e) => onChange(maskPhone(e.target.value))} />;
+}
+
+/** Campo de CPF com máscara 000.000.000-00 enquanto digita. */
+export function CpfInput({ value, onChange, ...p }: { value: string; onChange: (v: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  return <Input inputMode="numeric" placeholder="000.000.000-00" {...p} value={value} onChange={(e) => onChange(maskCpf(e.target.value))} />;
 }
 
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'brasa' | 'dark' }) {
