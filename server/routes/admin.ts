@@ -100,8 +100,10 @@ adminRouter.get('/customers', requirePerm('customers.view'), h((req) => {
   const q = String(req.query.q || '').trim();
   const p: unknown[] = [T(req)]; let w = '';
   if (q) { p.push(`%${q}%`, `%${digits(q) || '§'}%`); w = 'AND (c.name LIKE $2 OR c.phone LIKE $3)'; }
+  // ORDER BY last_order DESC já coloca quem nunca pediu (NULL) por último no MariaDB;
+  // não envolver o alias de agregação em expressão (ex.: last_order IS NULL), que o MariaDB recusa (erro 1247).
   return req.db.all(`SELECT c.*, COUNT(o.id) orders, COALESCE(SUM(o.total_cents),0) total_cents, MAX(o.created_at) last_order
-    FROM customers c LEFT JOIN orders o ON o.customer_id = c.id AND o.status <> 'cancelado' WHERE c.tenant_id = $1 ${w} GROUP BY c.id ORDER BY last_order IS NULL, last_order DESC LIMIT 200`, p);
+    FROM customers c LEFT JOIN orders o ON o.customer_id = c.id AND o.status <> 'cancelado' WHERE c.tenant_id = $1 ${w} GROUP BY c.id ORDER BY last_order DESC LIMIT 200`, p);
 }));
 adminRouter.get('/customers/:id', requirePerm('customers.view'), h(async (req) => {
   const c = await req.db.get('SELECT * FROM customers WHERE id = $1 AND tenant_id = $2', [id(req), T(req)]);
@@ -252,6 +254,14 @@ adminRouter.post('/logo', requirePerm('settings.manage'), h(async (req) => {
   if (file_id && !(await req.db.get('SELECT 1 FROM files WHERE id = $1 AND tenant_id = $2', [file_id, T(req)]))) throw bad('Arquivo inválido.');
   await req.db.run('UPDATE tenants SET logo_file_id = $1, updated_at = NOW(3) WHERE id = $2', [file_id, T(req)]);
   await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'settings.logo', ip: req.ip });
+  return { ok: true };
+}));
+// Imagem de capa do cardápio (banner atrás da logo). file_id null remove a capa.
+adminRouter.post('/cover', requirePerm('settings.manage'), h(async (req) => {
+  const { file_id } = z.object({ file_id: z.number().int().nullable() }).parse(req.body);
+  if (file_id && !(await req.db.get('SELECT 1 FROM files WHERE id = $1 AND tenant_id = $2', [file_id, T(req)]))) throw bad('Arquivo inválido.');
+  await req.db.run('UPDATE tenants SET cover_file_id = $1, updated_at = NOW(3) WHERE id = $2', [file_id, T(req)]);
+  await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'settings.cover', ip: req.ip });
   return { ok: true };
 }));
 adminRouter.post('/store/open', requirePerm('settings.manage', 'orders.manage'), h(async (req) => {

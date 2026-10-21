@@ -8,6 +8,7 @@ export const authRouter = Router();
 const DUMMY_HASH = hashPassword('senha-inexistente'); // iguala o tempo de resposta para usuários inexistentes
 
 export const logoUrl = (t: { logo_file_id: number | null }) => (t.logo_file_id ? `/files/${t.logo_file_id}` : null);
+export const coverUrl = (t: { cover_file_id: number | null }) => (t.cover_file_id ? `/files/${t.cover_file_id}` : null);
 
 /** Dados públicos mínimos da empresa (tela de login da equipe). */
 authRouter.get('/tenant/:slug', h(async (req) => {
@@ -68,7 +69,7 @@ authRouter.get('/me', h(async (req) => {
   return {
     ...base,
     user: { ...req.user, role_label: ROLE_LABELS[req.user.role], home: homeFor(req.user.role, req.user.permissions) },
-    tenant: { id: t.id, slug: t.slug, name: t.name, status: t.status, logo_url: logoUrl(t), plan: t.plan, trial_ends_at: t.trial_ends_at },
+    tenant: { id: t.id, slug: t.slug, name: t.name, status: t.status, logo_url: logoUrl(t), cover_url: coverUrl(t), plan: t.plan, trial_ends_at: t.trial_ends_at },
     permissions_catalog: PERMISSIONS,
   };
 }));

@@ -7,7 +7,7 @@ import { config } from '../config.js';
 import type { Q } from '../db.js';
 import { createOrder, selfOrderTable, STATUS_LABELS, event } from '../services/orders.js';
 import { newTableToken } from '../seed/catalog.js';
-import { logoUrl } from './auth.js';
+import { logoUrl, coverUrl } from './auth.js';
 
 export const publicRouter = Router();
 export const catalogRouter = Router();
@@ -48,7 +48,7 @@ publicRouter.get('/:slug/menu', h(async (req) => {
   if (!feature(t, 'delivery')) settings.accept_delivery = false;
   if (!feature(t, 'self_order')) { settings.self_order_enabled = false; settings.self_order_counter_enabled = false; }
   const zones = await req.db.all('SELECT id, name, fee_cents, min_order_cents, estimated_minutes FROM delivery_zones WHERE tenant_id = $1 AND active ORDER BY name', [t.id]);
-  return { tenant: { slug: t.slug, name: t.name, logo_url: logoUrl(t) }, settings, zones, ...(await loadCatalog(req.db, t.id, { onlyActive: true, onlyOnline: true })), demo: config.demoMode, platform: config.platformName };
+  return { tenant: { slug: t.slug, name: t.name, logo_url: logoUrl(t), cover_url: coverUrl(t) }, settings, zones, ...(await loadCatalog(req.db, t.id, { onlyActive: true, onlyOnline: true })), demo: config.demoMode, platform: config.platformName };
 }));
 
 const itemsSchema = z.array(z.object({ variant_id: z.number().int(), qty: z.number().int().min(1).max(99), option_ids: z.array(z.number().int()).max(20).optional(), notes: z.string().max(200).optional() })).min(1).max(60);
