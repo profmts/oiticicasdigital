@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { get, post } from './api';
 
 export interface Me { id: number; name: string; username: string; role: string; role_label: string; permissions: string[]; home: string; impersonatedBy?: number | null }
-export interface TenantInfo { id: number; slug: string; name: string; status: string; logo_url: string | null; plan: any; trial_ends_at: string | null }
+export interface TenantInfo { id: number; slug: string; name: string; status: string; logo_url: string | null; cover_url: string | null; plan: any; trial_ends_at: string | null }
 interface AuthCtx { me: Me | null; tenant: TenantInfo | null; loading: boolean; demo: boolean; platformUser: { name: string } | null; refresh: () => Promise<void>; logout: () => Promise<void>; can: (p: string) => boolean }
 const Ctx = createContext<AuthCtx>(null as any);
 

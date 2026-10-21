@@ -242,10 +242,19 @@ function ProductRow({ p, type, onOpen }: { p: any; type: string; onOpen: (p: any
 }
 
 function Hero({ s, tenant }: { s: any; tenant: any }) {
+  const cover = tenant.cover_url;
   return (
     <header className="relative overflow-hidden bg-lenha-900 pb-12 pt-6">
-      <div aria-hidden className="absolute inset-0 opacity-90"
-        style={{ background: 'repeating-linear-gradient(180deg, color-mix(in oklab, var(--color-brasa-500) 70%, white) 0 7px, transparent 7px 13px), linear-gradient(180deg, color-mix(in oklab, var(--color-brasa-500) 60%, white), var(--color-brasa-500) 60%, var(--color-brasa-700))', WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 35%, #000 100%)', maskImage: 'linear-gradient(180deg, transparent 0%, #000 35%, #000 100%)' }} />
+      {cover ? (
+        <>
+          <img src={cover} alt="" className="absolute inset-0 size-full object-cover" />
+          {/* escurecimento para a logo e o nome ficarem legíveis sobre qualquer foto */}
+          <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(10,18,36,.45), rgba(10,18,36,.35) 40%, rgba(10,18,36,.9))' }} />
+        </>
+      ) : (
+        <div aria-hidden className="absolute inset-0 opacity-90"
+          style={{ background: 'repeating-linear-gradient(180deg, color-mix(in oklab, var(--color-brasa-500) 70%, white) 0 7px, transparent 7px 13px), linear-gradient(180deg, color-mix(in oklab, var(--color-brasa-500) 60%, white), var(--color-brasa-500) 60%, var(--color-brasa-700))', WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 35%, #000 100%)', maskImage: 'linear-gradient(180deg, transparent 0%, #000 35%, #000 100%)' }} />
+      )}
       <div className="relative mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
         <TenantLogo url={tenant.logo_url} name={s.store_name} className="size-52 rounded-[2rem] bg-white object-contain text-5xl shadow-2xl ring-4 ring-white/70 sm:size-60" />
         {s.slogan ? <p className="mt-4 font-slab text-xl font-bold text-white drop-shadow">{s.slogan}</p> : <p className="mt-4 font-slab text-2xl font-bold text-white drop-shadow">{s.store_name}</p>}

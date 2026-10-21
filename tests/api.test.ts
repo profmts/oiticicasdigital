@@ -514,3 +514,18 @@ test('31 CPF opcional no pedido fica guardado no cadastro do cliente', async () 
   }));
   assert.equal((await db.get('SELECT cpf FROM customers WHERE tenant_id = $1 AND phone = $2', [espId, '83988887777'])).cpf, '12345678901', 'CPF anterior preservado');
 });
+
+test('32 agenda de clientes carrega sem erro e traz os totais por cliente', async () => {
+  const list = ok(await admin.get('/api/admin/customers'));
+  assert.ok(Array.isArray(list), 'retorna a lista de clientes');
+  assert.ok(list.some((c: any) => c.phone && c.orders >= 1), 'cliente com pedido aparece com telefone e contagem');
+  // busca por telefone também funciona
+  assert.ok(ok(await admin.get('/api/admin/customers?q=83988887777')).length >= 1, 'busca por telefone');
+});
+
+test('33 capa do cardápio: definir/remover e exposição no cardápio', async () => {
+  assert.equal((await admin.post('/api/admin/cover', { file_id: 999999 })).status, 400, 'arquivo inválido é recusado');
+  ok(await admin.post('/api/admin/cover', { file_id: null }));
+  assert.equal(ok(await admin.get('/api/auth/me')).tenant.cover_url, null, 'sem capa definida');
+  assert.ok('cover_url' in ok(await publico.get(`/api/public/${SLUG}/menu`)).tenant, 'o cardápio público expõe cover_url');
+});

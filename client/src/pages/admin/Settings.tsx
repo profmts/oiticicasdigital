@@ -229,14 +229,31 @@ function Branding({ s, set, busy }: { s: any; set: (k: string, v: any) => void; 
     const fd = new FormData(); fd.append('file', file);
     await run('logo', async () => { const r = await api('POST', '/api/uploads', fd); await post('/api/admin/logo', { file_id: r.id }); await refresh(); }, 'Logo atualizada.');
   };
+  const coverUpload = async (file: File) => {
+    const fd = new FormData(); fd.append('file', file);
+    await run('cover', async () => { const r = await api('POST', '/api/uploads', fd); await post('/api/admin/cover', { file_id: r.id }); await refresh(); }, 'Capa atualizada.');
+  };
+  const removeCover = () => run('cover', async () => { await post('/api/admin/cover', { file_id: null }); await refresh(); }, 'Capa removida.');
   return (
-    <Section title="Identidade visual do cardápio" desc="Logo e cores que o cliente vê no cardápio digital, no QR da mesa e no acompanhamento do pedido. O painel da equipe usa as cores da plataforma.">
+    <Section title="Identidade visual do cardápio" desc="Logo, capa e cores que o cliente vê no cardápio digital, no QR da mesa e no acompanhamento do pedido. O painel da equipe usa as cores da plataforma.">
       <div className="grid gap-5 md:grid-cols-[1fr_260px]">
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <TenantLogo url={tenant?.logo_url} name={s.store_name} className="size-24 rounded-2xl bg-white object-contain text-2xl ring-1 ring-lenha-100" />
             <label className="inline-flex h-11 cursor-pointer items-center rounded-xl border border-lenha-200 bg-white px-4 font-semibold">{busy === 'logo' ? 'Enviando…' : 'Trocar logo'}
               <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-semibold text-lenha-700">Imagem de capa (atrás da logo)</p>
+            <div className="relative h-24 overflow-hidden rounded-xl bg-lenha-900 ring-1 ring-lenha-200">
+              {tenant?.cover_url ? <img src={tenant.cover_url} alt="" className="size-full object-cover opacity-80" /> : <div className="grid h-full place-items-center text-sm text-white/60">Sem capa</div>}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-lenha-200 bg-white px-4 text-sm font-semibold">{busy === 'cover' ? 'Enviando…' : tenant?.cover_url ? 'Trocar capa' : 'Enviar capa'}
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && coverUpload(e.target.files[0])} /></label>
+              {tenant?.cover_url && <Button size="sm" variant="outline" onClick={removeCover}>Remover capa</Button>}
+            </div>
+            <p className="mt-1 text-xs text-lenha-500">Aparece no topo do cardápio, atrás da logo. Use uma imagem larga (ex.: 1200×600). A logo e o nome ficam por cima, com um leve escurecimento para continuarem legíveis. A capa vale na hora.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <ColorBox label="Cor principal" value={s.brand_color} onChange={(v) => set('brand_color', v)} />
@@ -246,7 +263,10 @@ function Branding({ s, set, busy }: { s: any; set: (k: string, v: any) => void; 
           <p className="text-sm text-lenha-500">As cores e a logo valem assim que você salvar as alterações.</p>
         </div>
         <div style={tenantTheme(s)} className="overflow-hidden rounded-2xl ring-1 ring-lenha-100" aria-label="Prévia">
-          <div className="bg-lenha-900 p-4 text-center"><TenantLogo url={tenant?.logo_url} name={s.store_name} className="mx-auto size-16 rounded-xl bg-white object-contain" /><p className="mt-2 font-slab font-bold text-white">{s.slogan || s.store_name}</p></div>
+          <div className="relative bg-lenha-900 p-4 text-center">
+            {tenant?.cover_url && <img src={tenant.cover_url} alt="" className="absolute inset-0 size-full object-cover opacity-60" />}
+            <div className="relative"><TenantLogo url={tenant?.logo_url} name={s.store_name} className="mx-auto size-16 rounded-xl bg-white object-contain" /><p className="mt-2 font-slab font-bold text-white">{s.slogan || s.store_name}</p></div>
+          </div>
           <div className="space-y-2 p-3">
             <div className="flex items-center justify-between rounded-xl bg-white px-3 py-2 ring-1 ring-lenha-100"><span className="text-sm font-semibold">Produto exemplo</span><span className="font-cond font-bold text-brasa-700">R$ 10,00</span></div>
             <div className="rounded-xl bg-brasa-500 py-2 text-center text-sm font-semibold text-white">Ver carrinho</div>
