@@ -405,12 +405,16 @@ test('24 M8: excluir produto (senha + soft/hard delete)', async () => {
   assert.ok(!ok(await publico.get(`/api/public/${SLUG}/menu`)).categories.flatMap((c: any) => c.products).some((p: any) => p.id === id2), 'some do cardápio');
 });
 
-test('25 M7: excluir mesa exige a senha do administrador da plataforma', async () => {
+test('25 excluir mesa exige a senha do próprio administrador da empresa', async () => {
   const id = ok(await admin.post('/api/tables', { label: 'T99' })).id;
-  assert.equal((await admin.del(`/api/tables/${id}`)).status, 403, 'precisa da senha da plataforma');
-  assert.equal((await admin.del(`/api/tables/${id}`, { auth: { username: 'sergio', password: 'senhaForte123' } })).status, 403, 'senha da empresa não serve');
-  assert.equal(ok(await admin.del(`/api/tables/${id}`, { auth: { username: 'root', password: 'senhaMuitoForte1' } })).soft, false, 'sem histórico: apagada de vez');
+  assert.equal((await admin.del(`/api/tables/${id}`)).status, 403, 'precisa confirmar a senha');
+  assert.equal((await admin.del(`/api/tables/${id}`, { password: 'errada' })).status, 403, 'senha errada não serve');
+  assert.equal(ok(await admin.del(`/api/tables/${id}`, { password: 'senhaForte123' })).soft, false, 'sem histórico: apagada de vez');
   assert.ok(!ok(await admin.get('/api/tables/admin')).some((t: any) => t.id === id), 'sumiu da lista de mesas');
+  // editar o nome da mesa
+  const id2 = ok(await admin.post('/api/tables', { label: 'Antiga' })).id;
+  ok(await admin.put(`/api/tables/${id2}`, { label: 'Varanda', seats: null, active: true, sort: 99, qr_enabled: true }));
+  assert.ok(ok(await admin.get('/api/tables/admin')).some((t: any) => t.id === id2 && t.label === 'Varanda'), 'nome atualizado');
 });
 
 test('26 M5: liberar mesa vazia; recusar mesa com consumo', async () => {

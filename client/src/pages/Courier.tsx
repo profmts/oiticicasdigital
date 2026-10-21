@@ -3,8 +3,9 @@ import { get, post } from '../lib/api';
 import { useAuth, useData, useConnection, beep } from '../lib/hooks';
 import { money, time, phoneFmt, mapsLink, waLink, STATUS_LABEL } from '../lib/format';
 import { PaymentDialog } from '../components/PaymentDialog';
-import { Badge, Button, Modal, Spinner, Textarea, Toggle, useAction, cx } from '../components/ui';
+import { Badge, Button, Modal, Spinner, Textarea, Toggle, useAction, useToast, cx } from '../components/ui';
 import { TenantLogo } from '../components/brand';
+import { TeamScreensMenu } from '../components/TeamNav';
 
 const PAY: Record<string, string> = { dinheiro: 'Dinheiro', pix: 'Pix', debito: 'Débito', credito: 'Crédito' };
 
@@ -19,9 +20,14 @@ export default function Courier() {
   const [note, setNote] = useState<any>(null);
   const [known, setKnown] = useState<string>('');
   const { run, busy } = useAction();
+  const toast = useToast();
   useEffect(() => { get('/api/admin/settings').then((s) => { setMethods(s.payment_methods || []); setCity(s.city || ''); }).catch(() => {}); }, []);
   const ids = (data?.deliveries || []).filter((d: any) => d.status !== 'concluido').map((d: any) => d.id).join(',');
-  useEffect(() => { if (known && ids && ids !== known && ids.split(',').some((i) => !known.split(',').includes(i))) beep(2); setKnown(ids); }, [ids]); // eslint-disable-line
+  // Nova entrega atribuída: som + aviso em texto.
+  useEffect(() => {
+    if (known && ids && ids !== known && ids.split(',').some((i) => !known.split(',').includes(i))) { beep(2); toast('Nova entrega atribuída a você.', 'info'); }
+    setKnown(ids);
+  }, [ids]); // eslint-disable-line
 
   const active = (data?.deliveries || []).filter((d: any) => d.status !== 'concluido');
   const done = (data?.deliveries || []).filter((d: any) => d.status === 'concluido');
@@ -32,13 +38,28 @@ export default function Courier() {
         <TenantLogo url={tenant?.logo_url} name={tenant?.name || ''} className="size-10 rounded-lg bg-white object-contain text-xs" />
         <div className="leading-tight"><p className="font-slab text-lg font-bold">Minhas entregas</p><p className="text-sm text-lenha-200">{me?.name}</p></div>
         <span className={cx('ml-auto size-2.5 rounded-full', online ? 'bg-green-400' : 'bg-red-400')} />
+        <TeamScreensMenu dark current="/motoboy" />
         {me?.home?.startsWith('/admin') && <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = me.home))} className="flex h-9 items-center gap-1 rounded-full bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar à tela anterior"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Voltar</button>}
         <button onClick={logout} className="h-9 rounded-full px-3 text-sm font-semibold hover:bg-white/10">Sair</button>
       </header>
-      <main className="mx-auto max-w-lg space-y-4 p-3">
+      <main className="mx-auto max-w-2xl space-y-4 p-3">
         {data && (
           <div className="rounded-2xl bg-white p-4 ring-1 ring-lenha-100">
             <Toggle checked={data.available} onChange={(v) => run('av', () => post('/api/courier/availability', { available: v }).then(reload))} label={data.available ? 'Disponível para novas entregas' : 'Indisponível (pausa)'} />
+          </div>
+        )}
+        {data?.summary && (
+          <div className="rounded-2xl bg-white p-4 ring-1 ring-lenha-100">
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="rounded-xl bg-lenha-50 p-3"><p className="text-sm text-lenha-500">Em andamento</p><p className="font-cond text-3xl font-bold tabnums">{data.summary.em_andamento}</p></div>
+              <div className="rounded-xl bg-lenha-50 p-3"><p className="text-sm text-lenha-500">Concluídas (12h)</p><p className="font-cond text-3xl font-bold tabnums">{data.summary.concluidas}</p></div>
+            </div>
+            <div className="mt-3 rounded-xl bg-lenha-900 p-4 text-white">
+              <p className="text-sm text-white/70">A repassar ao caixa (dinheiro)</p>
+              <p className="font-cond text-4xl font-bold tabnums">{money(data.summary.repassar_dinheiro_cents)}</p>
+              {data.summary.repassar_outras_cents > 0 && <p className="mt-1 text-sm text-white/70">Pix e cartão recebidos: {money(data.summary.repassar_outras_cents)}</p>}
+            </div>
+            <p className="mt-2 text-xs text-lenha-500">O caixa confere esses valores no acerto do motoboy.</p>
           </div>
         )}
         {!data ? <Spinner /> : active.length === 0 ? (

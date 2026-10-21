@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import QRCode from 'qrcode';
-import { h, bad, notFound, conflict, requirePerm, audit, broadcast, getSettings, getSetting, confirmPassword, authorizePlatform, HttpError, tenantBySlug, tenantActive, feature, rateLimit, type TenantCtx } from '../core.js';
+import { h, bad, notFound, conflict, requirePerm, audit, broadcast, getSettings, getSetting, confirmPassword, HttpError, tenantBySlug, tenantActive, feature, rateLimit, type TenantCtx } from '../core.js';
 import { config } from '../config.js';
 import type { Q } from '../db.js';
 import { createOrder, selfOrderTable, STATUS_LABELS, event } from '../services/orders.js';
@@ -324,23 +324,23 @@ catalogRouter.put('/tables/:id', requirePerm('settings.manage', 'tables.manage')
   await req.db.run('UPDATE dining_tables SET label=$1, seats=$2, active=$3, sort=$4, qr_enabled=$5 WHERE id=$6 AND tenant_id=$7', [t.label, t.seats ?? null, t.active, t.sort, t.qr_enabled, Number(req.params.id), T(req)]);
   broadcast(T(req), 'tables'); return { ok: true };
 }));
-// M7: excluir mesa. Protegida pela senha do administrador da PLATAFORMA (o dono do sistema), não do administrador da empresa.
+// Excluir mesa. Confirmada com a senha do PRÓPRIO administrador da empresa (como na exclusão de produto).
 // Mesa com histórico de pedidos some das listas mas mantém o vínculo com os pedidos antigos (soft delete).
 // Mesa sem nenhum pedido é apagada de vez.
 catalogRouter.delete('/tables/:id', requirePerm('settings.manage', 'tables.manage'), h(async (req) => {
   const tid = Number(req.params.id);
-  const { auth } = z.object({ auth: z.object({ username: z.string().max(60), password: z.string().max(200) }).optional() }).parse(req.body);
+  const { password } = z.object({ password: z.string().max(200).optional() }).parse(req.body);
   const table = await req.db.get('SELECT * FROM dining_tables WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL', [tid, T(req)]);
   if (!table) throw notFound('Mesa não encontrada.');
   if (await req.db.get("SELECT 1 FROM orders WHERE table_id = $1 AND type = 'mesa' AND status IN ('aberto','fechamento') LIMIT 1", [tid])) throw conflict('Esta mesa está aberta. Feche a conta antes de excluir.');
-  const platformUserId = await authorizePlatform(req, auth);
+  await confirmPassword(req, password);
   const hist = await req.db.get('SELECT 1 FROM orders WHERE table_id = $1 LIMIT 1', [tid]);
   if (hist) {
     await req.db.run('UPDATE dining_tables SET active = 0, deleted_at = NOW(3) WHERE id = $1', [tid]);
   } else {
     await req.db.run('DELETE FROM dining_tables WHERE id = $1 AND tenant_id = $2', [tid, T(req)]);
   }
-  await audit(req.db, { tenantId: T(req), userId: req.user!.id, platformUserId, action: 'table.delete', entity: 'table', entityId: tid, data: { label: table.label, soft: !!hist }, ip: req.ip });
+  await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'table.delete', entity: 'table', entityId: tid, data: { label: table.label, soft: !!hist }, ip: req.ip });
   broadcast(T(req), 'tables'); return { ok: true, soft: !!hist };
 }));
 catalogRouter.post('/tables/:id/regenerate-qr', requirePerm('settings.manage', 'tables.manage'), h(async (req) => {
