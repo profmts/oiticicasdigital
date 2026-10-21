@@ -3,19 +3,35 @@ import { post, put, del } from '../../lib/api';
 import { useAuth, useData } from '../../lib/hooks';
 import { Badge, Button, Field, Input, Modal, Spinner, Toggle, useAction } from '../../components/ui';
 
-/** M7: excluir mesa exige a senha do administrador da plataforma (o dono do sistema). */
+/** Excluir mesa: confirmada com a senha do próprio administrador da empresa. */
 function ExcluirMesa({ table, onClose, onDone }: { table: any; onClose: () => void; onDone: () => void }) {
-  const [username, setUser] = useState(''); const [password, setPass] = useState('');
+  const [password, setPass] = useState('');
   const { run, busy } = useAction();
+  const excluir = () => run('x', () => del(`/api/tables/${table.id}`, { password }).then(onDone), 'Mesa excluída.');
   return (
     <Modal open onClose={onClose} title={`Excluir a mesa ${table.label}`}
-      footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!username || !password}
-        onClick={() => run('x', () => del(`/api/tables/${table.id}`, { auth: { username, password } }).then(onDone), 'Mesa excluída.')}>Excluir mesa</Button>}>
-      <p className="mb-3 text-sm text-lenha-600">A exclusão de mesa é uma ação do dono do sistema. Informe o usuário e a senha do administrador da plataforma.</p>
-      <div className="space-y-3">
-        <Field label="Usuário da plataforma"><Input value={username} autoCapitalize="none" onChange={(e) => setUser(e.target.value)} /></Field>
-        <Field label="Senha da plataforma"><Input type="password" value={password} onChange={(e) => setPass(e.target.value)} /></Field>
-      </div>
+      footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!password} onClick={excluir}>Excluir mesa</Button>}>
+      <p className="mb-3 text-sm text-lenha-600">A mesa some das listas. Se já teve pedidos, o histórico é preservado. Confirme com a sua senha de administrador.</p>
+      <form onSubmit={(e) => { e.preventDefault(); if (password) excluir(); }}>
+        <Field label="Sua senha"><Input type="password" value={password} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" autoFocus /></Field>
+        <button type="submit" hidden />
+      </form>
+    </Modal>
+  );
+}
+
+/** Editar o nome (número) da mesa. */
+function EditarMesa({ table, onClose, onDone }: { table: any; onClose: () => void; onDone: () => void }) {
+  const [label, setLabel] = useState(table.label);
+  const { run, busy } = useAction();
+  const salvar = () => run('e', () => put(`/api/tables/${table.id}`, { label: label.trim(), seats: table.seats, active: table.active, sort: table.sort, qr_enabled: table.qr_enabled }).then(onDone), 'Nome da mesa atualizado.');
+  return (
+    <Modal open onClose={onClose} title={`Editar a mesa ${table.label}`}
+      footer={<Button className="w-full" busy={!!busy} disabled={label.trim().length < 1 || label.trim() === table.label} onClick={salvar}>Salvar nome</Button>}>
+      <form onSubmit={(e) => { e.preventDefault(); if (label.trim()) salvar(); }}>
+        <Field label="Nome ou número da mesa" hint="Ex.: 7, Varanda, Balcão 2."><Input value={label} onChange={(e) => setLabel(e.target.value)} autoFocus /></Field>
+        <button type="submit" hidden />
+      </form>
     </Modal>
   );
 }
@@ -30,6 +46,7 @@ export default function QrCodes() {
   const [count, setCount] = useState('10');
   const [label, setLabel] = useState('');
   const [excluir, setExcluir] = useState<any>(null);
+  const [editar, setEditar] = useState<any>(null);
   const { run, busy } = useAction();
   if (!tables.data || !tenant) return <Spinner />;
   const base = `${location.origin}/${tenant.slug}`;
@@ -103,6 +120,7 @@ export default function QrCodes() {
                 <Button size="sm" variant="outline" onClick={() => printCards([{ title: `Mesa ${t.label}`, subtitle: 'Peça pelo celular: aponte a câmera', url: tableUrl(t) }])}>Imprimir</Button>
                 <a href={tableUrl(t)} target="_blank"><Button size="sm" variant="ghost">Testar</Button></a>
                 {can('settings.manage') && <Button size="sm" variant="ghost" onClick={() => confirm(`Gerar um novo QR para a mesa ${t.label}? O QR impresso atual deixa de funcionar.`) && run('r', () => post(`/api/tables/${t.id}/regenerate-qr`).then(tables.reload), 'Novo QR gerado. Imprima e substitua o antigo.')}>Novo QR</Button>}
+                <Button size="sm" variant="ghost" onClick={() => setEditar(t)}>Editar nome</Button>
                 <Button size="sm" variant="ghost" onClick={() => run('a', () => put(`/api/tables/${t.id}`, { label: t.label, seats: t.seats, active: !t.active, sort: t.sort, qr_enabled: t.qr_enabled }).then(tables.reload))}>{t.active ? 'Desativar mesa' : 'Reativar'}</Button>
                 {can('settings.manage') && <Button size="sm" variant="ghost" className="text-alerta" onClick={() => setExcluir(t)}>Excluir</Button>}
               </div>
@@ -110,6 +128,7 @@ export default function QrCodes() {
           ))}
         </div>
         {excluir && <ExcluirMesa table={excluir} onClose={() => setExcluir(null)} onDone={() => { setExcluir(null); tables.reload(); }} />}
+        {editar && <EditarMesa table={editar} onClose={() => setEditar(null)} onDone={() => { setEditar(null); tables.reload(); }} />}
         <form className="mt-4 flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); run('t', () => post('/api/tables', { label, sort: tables.data!.length + 1 }).then(() => { setLabel(''); tables.reload(); }), 'Mesa adicionada.'); }}>
           <Field label="Nova mesa (nome ou número)"><Input value={label} onChange={(e) => setLabel(e.target.value)} className="w-44" /></Field>
           <Button type="submit" variant="outline" disabled={!label.trim()} busy={busy === 't'}>Adicionar</Button>

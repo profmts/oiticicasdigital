@@ -335,7 +335,18 @@ opsRouter.get('/courier/deliveries', requirePerm('delivery.courier'), h(async (r
   const items = ids.length ? await req.db.all(`SELECT order_id, name, variant_name, qty FROM order_items WHERE status <> 'cancelado' AND order_id IN ($1)`, [ids]) : [];
   const picked = ids.length ? await req.db.all(`SELECT DISTINCT order_id FROM order_events WHERE type = 'courier_pickup' AND order_id IN ($1)`, [ids]) : [];
   const me = await req.db.get('SELECT available FROM users WHERE id = $1', [req.user!.id]);
-  return { available: !!me.available, deliveries: rows.map((r) => ({ ...r, address: r.address_json, address_json: undefined, picked_up: picked.some((p) => p.order_id === r.id), items: items.filter((i) => i.order_id === r.id) })) };
+  // Resumo para o motoboy acompanhar e saber o que repassar ao caixa.
+  // "A repassar" = pagamentos que ele recebeu e que ainda não foram acertados com o caixa (mesma base do acerto do caixa).
+  const pend = await req.db.all('SELECT method, amount_cents FROM payments WHERE tenant_id = $1 AND collected_by = $2 AND cash_session_id IS NULL AND NOT voided', [T(req), req.user!.id]);
+  const sum = (arr: any[]) => arr.reduce((a, p) => a + p.amount_cents, 0);
+  const deliveries = rows.map((r) => ({ ...r, address: r.address_json, address_json: undefined, picked_up: picked.some((p) => p.order_id === r.id), items: items.filter((i) => i.order_id === r.id) }));
+  const summary = {
+    em_andamento: deliveries.filter((d) => d.status !== 'concluido').length,
+    concluidas: deliveries.filter((d) => d.status === 'concluido').length,
+    repassar_dinheiro_cents: sum(pend.filter((p) => p.method === 'dinheiro')),
+    repassar_outras_cents: sum(pend.filter((p) => p.method !== 'dinheiro')),
+  };
+  return { available: !!me.available, summary, deliveries };
 }));
 
 async function courierOrder(req: Request) {

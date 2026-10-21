@@ -6,6 +6,7 @@ import { ProductPicker, CartList, cartTotal, type CartLine } from '../components
 import { ReasonDialog, OrderDrawer } from '../components/OrderDrawer';
 import { Badge, Button, Modal, Spinner, Input, Field, Select, useAction, useToast, cx } from '../components/ui';
 import { TenantLogo } from '../components/brand';
+import { TeamScreensMenu } from '../components/TeamNav';
 
 export const TABLE_STATE: Record<string, { label: string; cls: string }> = {
   livre: { label: 'Livre', cls: 'bg-white ring-1 ring-lenha-200 text-lenha-700' },
@@ -30,7 +31,16 @@ export function TablesBoard({ admin }: { admin?: boolean }) {
   useLive((e) => {
     if (e.scope === 'orders' && e.kind === 'kitchen' && tables.data?.some((t) => t.order?.mine)) tables.reload();
   });
-  useLive((e) => { if (e.scope === 'orders' && (e.kind === 'qr_order' || e.kind === 'call')) { tables.reload(); if (!admin) beep(2); } });
+  useLive((e) => {
+    if (e.scope === 'orders' && (e.kind === 'qr_order' || e.kind === 'call')) {
+      tables.reload();
+      if (!admin) {
+        beep(2);
+        const mesa = (e as any).table ? `Mesa ${(e as any).table}: ` : '';
+        toast(mesa + (e.kind === 'qr_order' ? 'cliente fez pedido pelo QR.' : (e as any).call === 'conta' ? 'pediu a conta.' : 'chamou o garçom.'), 'info');
+      }
+    }
+  });
   // aviso quando um pedido de mesa minha fica pronto
   const readyMine = (tables.data || []).filter((t) => t.state === 'pedido_pronto' && t.order?.waiter_id === me?.id).map((t) => t.id).join(',');
   useEffect(() => { if (readyMine && !admin) { beep(2); toast('Tem pedido pronto para servir.', 'info'); } }, [readyMine]); // eslint-disable-line
@@ -212,6 +222,7 @@ export default function Waiter() {
         <TenantLogo url={tenant?.logo_url} name={tenant?.name || ''} className="size-10 rounded-lg bg-white object-contain text-xs" />
         <div className="leading-tight"><p className="font-slab text-lg font-bold">Mesas</p><p className="text-sm text-lenha-200">{me?.name}</p></div>
         <span className={cx('ml-auto size-2.5 rounded-full', online ? 'bg-green-400' : 'bg-red-400')} title={online ? 'Conectado' : 'Reconectando'} />
+        <TeamScreensMenu dark current="/garcom" />
         {me?.home?.startsWith('/admin') && <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = me.home))} className="flex h-9 items-center gap-1 rounded-full bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar à tela anterior"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Voltar</button>}
         <button onClick={logout} className="h-9 rounded-full px-3 text-sm font-semibold hover:bg-white/10">Sair</button>
       </header>

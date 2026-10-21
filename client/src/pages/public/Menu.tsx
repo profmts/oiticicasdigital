@@ -6,6 +6,7 @@ import { tenantTheme } from '../../lib/theme';
 import { ProductModal, priceLabel, variantsFor, cartTotal, lineTotal, type CartLine } from '../../components/catalog';
 import { Button, Field, Input, Select, Textarea, Modal, MoneyInput, PhoneInput, CpfInput, Spinner, ErrorBox, cx } from '../../components/ui';
 import { TenantLogo, PlatformLogo } from '../../components/brand';
+import { TeamScreensMenu } from '../../components/TeamNav';
 
 type Mode = 'online' | 'mesa' | 'balcao';
 const load = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || '') ?? d; } catch { return d; } };
@@ -55,6 +56,7 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
 
   return (
     <div style={tenantTheme(s)} className="pb-28 text-lenha-900">
+      {mode === 'online' && <div className="fixed right-3 top-3 z-40"><TeamScreensMenu current={`/${slug}`} /></div>}
       {data.demo && <div className="bg-ouro-400 px-4 py-1.5 text-center text-sm font-semibold text-lenha-900">Ambiente de demonstração — pedidos aqui são fictícios.</div>}
       <Hero s={s} tenant={data.tenant} />
 
