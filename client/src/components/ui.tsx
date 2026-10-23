@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { setAuthAsker, ApiError } from '../lib/api';
-import { maskCents, maskPhone, maskCpf } from '../lib/format';
+import { maskCents, maskPhone, maskCpf, normUser, genPassword } from '../lib/format';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 export { cx };
@@ -170,6 +170,51 @@ export function PhoneInput({ value, onChange, ...p }: { value: string; onChange:
 /** Campo de CPF com máscara 000.000.000-00 enquanto digita. */
 export function CpfInput({ value, onChange, ...p }: { value: string; onChange: (v: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   return <Input inputMode="numeric" placeholder="000.000.000-00" {...p} value={value} onChange={(e) => onChange(maskCpf(e.target.value))} />;
+}
+
+/** Campo de login: @ fora da caixa, normaliza o que é digitado e mostra legenda dinâmica. */
+export function LoginInput({ value, onChange, suggest = 'dono', label = 'Usuário (login)' }: { value: string; onChange: (v: string) => void; suggest?: string; label?: string }) {
+  const v = value.trim();
+  return (
+    <Field label={label}>
+      <div className="flex items-center gap-2">
+        <span className="text-xl font-bold text-lenha-500">@</span>
+        <Input value={value} onChange={(e) => onChange(normUser(e.target.value))} placeholder="digite o login" autoCapitalize="none" autoComplete="off" className="flex-1" />
+      </div>
+      <p className="mt-1 text-xs leading-snug text-lenha-500">
+        {v ? <>Vai ficar: <strong className="text-ok">@{v}</strong></> : <>Sugestão: <strong>@{suggest || 'dono'}</strong>. Só letras minúsculas e números, tudo junto, sem espaço, acento ou ç.</>}
+      </p>
+    </Field>
+  );
+}
+
+/** Senha + confirmar, com mostrar/ocultar, gerar (preenche as duas) e regras em lista. */
+export function pwValid(pw: string, pw2: string) { return pw.length >= 8 && pw === pw2; }
+export function PasswordFields({ pw, pw2, setPw, setPw2, label = 'Senha inicial' }: { pw: string; pw2: string; setPw: (v: string) => void; setPw2: (v: string) => void; label?: string }) {
+  const [show, setShow] = useState(false);
+  const short = pw.length > 0 && pw.length < 8;
+  const okLen = pw.length >= 8;
+  const mismatch = pw2.length > 0 && pw !== pw2;
+  return (
+    <>
+      <Field label={label}>
+        <div className="flex gap-2">
+          <Input type={show ? 'text' : 'password'} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" className="flex-1" />
+          <button type="button" onClick={() => setShow((s) => !s)} className="h-11 shrink-0 rounded-xl border border-lenha-200 bg-lenha-50 px-3 text-sm font-semibold text-lenha-700">{show ? 'Ocultar' : 'Mostrar'}</button>
+        </div>
+        <button type="button" onClick={() => { const g = genPassword(); setPw(g); setPw2(g); setShow(true); }} className="mt-2 text-sm font-semibold text-brasa-600 underline">Gerar senha automática (opcional)</button>
+      </Field>
+      <Field label="Confirmar senha">
+        <Input type={show ? 'text' : 'password'} value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
+        <ul className="mt-2 space-y-0.5 text-xs text-lenha-500">
+          <li className={cx(short && 'font-semibold text-alerta', okLen && 'font-semibold text-ok')}>{short ? `Faltam ${8 - pw.length} para o mínimo de 8 caracteres` : 'Mínimo de 8 caracteres'}</li>
+          <li>Pode usar letras, números e símbolos</li>
+          <li>Evite 12345678, a data de nascimento ou o próprio nome</li>
+          {pw2.length > 0 && <li className={cx('font-semibold', mismatch ? 'text-alerta' : 'text-ok')}>{mismatch ? 'As duas senhas precisam ser iguais' : 'As senhas conferem'}</li>}
+        </ul>
+      </Field>
+    </>
+  );
 }
 
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'brasa' | 'dark' }) {

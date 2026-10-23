@@ -529,3 +529,18 @@ test('33 capa do cardápio: definir/remover e exposição no cardápio', async (
   assert.equal(ok(await admin.get('/api/auth/me')).tenant.cover_url, null, 'sem capa definida');
   assert.ok('cover_url' in ok(await publico.get(`/api/public/${SLUG}/menu`)).tenant, 'o cardápio público expõe cover_url');
 });
+
+test('34 admin da empresa criado com CPF, telefone e e-mail; login em minúsculas', async () => {
+  const r = ok(await plat.post('/api/platform/tenants', { name: 'Login Teste', slug: 'login-teste',
+    admin: { name: 'Dona Maria', username: 'maria', password: 'senhaForte1', cpf: '123.456.789-01', phone: '(83) 99999-8888', email: ' maria@ex.com ' } }));
+  const u = await db.get('SELECT username, cpf, phone, email, role FROM users WHERE tenant_id = $1', [r.id]);
+  assert.equal(u.username, 'maria'); assert.equal(u.role, 'admin');
+  assert.equal(u.cpf, '12345678901', 'CPF só dígitos');
+  assert.equal(u.phone, '83999998888', 'telefone só dígitos');
+  assert.equal(u.email, 'maria@ex.com', 'e-mail aparado');
+  assert.equal((await new Client().post('/api/auth/login', { company: 'login-teste', username: 'maria', password: 'senhaForte1' })).status, 200, 'login do admin funciona');
+  // adicionar outro administrador pela plataforma, sem CPF/telefone
+  const tid = (await db.get("SELECT id FROM tenants WHERE slug = 'login-teste'")).id;
+  ok(await plat.post(`/api/platform/tenants/${tid}/admins`, { name: 'Segundo Dono', username: 'dono2', password: 'senhaForte2' }));
+  assert.ok(ok(await plat.get(`/api/platform/tenants/${tid}/users`)).some((x: any) => x.username === 'dono2' && x.role === 'admin'));
+});
