@@ -1,6 +1,19 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { h, bad, notFound, conflict, HttpError, PLATFORM_COOKIE, COOKIE, createSession, checkPassword, hashPassword, sha256, audit, authorizePlatform, requirePlatform, cookieOpts, rateLimit } from '../core.js';
+import { h, bad, notFound, conflict, HttpError, PLATFORM_COOKIE, COOKIE, createSession, checkPassword, hashPassword, sha256, audit, authorizePlatform, requirePlatform, cookieOpts, rateLimit, digits } from '../core.js';
+
+// Esquema do administrador criado pela plataforma (primeira conta da empresa). CPF, telefone e e-mail são opcionais.
+const adminSchema = z.object({
+  name: z.string().min(2).max(80),
+  username: z.string().min(3).max(40).regex(/^[a-z0-9._-]+$/, 'Use só letras minúsculas, números, ponto, hífen ou sublinhado.'),
+  password: z.string().min(8).max(200),
+  cpf: z.string().max(14).optional(), phone: z.string().max(25).optional(), email: z.string().max(160).optional(),
+});
+const adminFields = (a: { cpf?: string; phone?: string; email?: string }) => ({
+  phone: a.phone ? digits(a.phone).slice(0, 13) : '', // coluna phone é NOT NULL
+  cpf: a.cpf && digits(a.cpf).length === 11 ? digits(a.cpf) : null,
+  email: a.email?.trim() ? a.email.trim().slice(0, 160) : null,
+});
 import { createTenant, newTableToken } from '../seed/catalog.js';
 import { config } from '../config.js';
 
@@ -71,15 +84,16 @@ platformRouter.post('/tenants', h(async (req) => {
     name: z.string().min(2).max(80), slug: slugSchema, plan_id: z.number().int().nullable().optional(), status: z.enum(['ativo', 'teste']).default('ativo'),
     trial_days: z.number().int().min(1).max(90).optional(), document: z.string().max(30).default(''), contact_name: z.string().max(80).default(''),
     contact_phone: z.string().max(25).default(''), contact_email: z.string().max(120).default(''),
-    admin: z.object({ name: z.string().min(2).max(80), username: z.string().min(3).max(40).regex(/^[a-zA-Z0-9._-]+$/), password: z.string().min(8).max(200) }),
+    admin: adminSchema,
     tables: z.number().int().min(0).max(200).default(0),
   }).parse(req.body);
   if (RESERVED.has(b.slug)) throw bad('Este endereço é reservado pelo sistema. Escolha outro.');
   if (await req.db.get('SELECT 1 FROM tenants WHERE slug = $1', [b.slug])) throw conflict('Este endereço já está em uso.');
   const hash = await hashPassword(b.admin.password);
+  const af = adminFields(b.admin);
   const id = await req.db.tx(async (q) => {
     const tid = await createTenant(q, { ...b, trial_ends_at: b.status === 'teste' ? new Date(Date.now() + (b.trial_days || 15) * 864e5).toISOString() : null });
-    await q.run("INSERT INTO users (tenant_id, name, username, password_hash, role) VALUES ($1,$2,$3,$4,'admin')", [tid, b.admin.name, b.admin.username, hash]);
+    await q.run("INSERT INTO users (tenant_id, name, username, password_hash, role, phone, cpf, email) VALUES ($1,$2,$3,$4,'admin',$5,$6,$7)", [tid, b.admin.name, b.admin.username.toLowerCase(), hash, af.phone, af.cpf, af.email]);
     for (let i = 1; i <= b.tables; i++) await q.run('INSERT INTO dining_tables (tenant_id, label, sort, qr_token) VALUES ($1,$2,$3,$4)', [tid, String(i), i, newTableToken()]);
     await audit(q, { tenantId: tid, platformUserId: P(req), action: 'platform.tenant_create', entity: 'tenant', entityId: tid, data: { slug: b.slug, plan_id: b.plan_id, status: b.status }, ip: req.ip });
     return tid;
@@ -104,14 +118,15 @@ platformRouter.put('/tenants/:id', h(async (req) => {
   return { ok: true, slug_changed: b.slug !== old.slug };
 }));
 
-platformRouter.get('/tenants/:id/users', h((req) => req.db.all('SELECT id, name, username, role, active FROM users WHERE tenant_id = $1 ORDER BY role, name', [Number(req.params.id)])));
+platformRouter.get('/tenants/:id/users', h((req) => req.db.all('SELECT id, name, username, role, active, phone, cpf, email FROM users WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY role, name', [Number(req.params.id)])));
 platformRouter.post('/tenants/:id/admins', h(async (req) => {
   // cria um administrador para a empresa (ex.: a empresa Espetinho do Sergio criada na primeira execução)
-  const b = z.object({ name: z.string().min(2).max(80), username: z.string().min(3).max(40).regex(/^[a-zA-Z0-9._-]+$/), password: z.string().min(8).max(200) }).parse(req.body);
+  const b = adminSchema.parse(req.body);
   const tid = Number(req.params.id);
   if (!(await req.db.get('SELECT 1 FROM tenants WHERE id = $1', [tid]))) throw notFound();
   if (await req.db.get('SELECT 1 FROM users WHERE tenant_id = $1 AND lower(username) = lower($2)', [tid, b.username])) throw conflict('Este usuário já existe nesta empresa.');
-  const r = await req.db.get("INSERT INTO users (tenant_id, name, username, password_hash, role) VALUES ($1,$2,$3,$4,'admin') RETURNING id", [tid, b.name, b.username, await hashPassword(b.password)]);
+  const af = adminFields(b);
+  const r = await req.db.get("INSERT INTO users (tenant_id, name, username, password_hash, role, phone, cpf, email) VALUES ($1,$2,$3,$4,'admin',$5,$6,$7) RETURNING id", [tid, b.name, b.username.toLowerCase(), await hashPassword(b.password), af.phone, af.cpf, af.email]);
   await audit(req.db, { tenantId: tid, platformUserId: P(req), action: 'platform.admin_create', entity: 'user', entityId: r.id, data: { username: b.username }, ip: req.ip });
   return { id: r.id };
 }));
@@ -132,7 +147,7 @@ platformRouter.post('/tenants/:id/reset', h(async (req) => {
   const b = z.object({
     confirm: z.string(),
     auth: z.object({ username: z.string().max(60), password: z.string().max(200) }).optional(),
-    admin: z.object({ name: z.string().min(2).max(80), username: z.string().min(3).max(40).regex(/^[a-zA-Z0-9._-]+$/, 'Use apenas letras, números, ponto, hífen ou sublinhado.'), password: z.string().min(8).max(200) }),
+    admin: adminSchema,
   }).parse(req.body);
   const tid = Number(req.params.id);
   const tenant = await req.db.get('SELECT id, slug, name FROM tenants WHERE id = $1', [tid]);
@@ -159,8 +174,8 @@ platformRouter.post('/tenants/:id/reset', h(async (req) => {
     await q.run('DELETE FROM users WHERE tenant_id = $1', [tid]);
     // Zera a numeração de pedidos e cria o administrador novo do cliente
     await q.run('UPDATE tenants SET order_seq = 0 WHERE id = $1', [tid]);
-    await q.run("INSERT INTO users (tenant_id, name, username, password_hash, role) VALUES ($1,$2,$3,$4,'admin')",
-      [tid, b.admin.name, b.admin.username, await hashPassword(b.admin.password)]);
+    await q.run("INSERT INTO users (tenant_id, name, username, password_hash, role, phone, cpf, email) VALUES ($1,$2,$3,$4,'admin',$5,$6,$7)",
+      [tid, b.admin.name, b.admin.username.toLowerCase(), await hashPassword(b.admin.password), adminFields(b.admin).phone, adminFields(b.admin).cpf, adminFields(b.admin).email]);
     await q.run('SET @od_wipe = NULL');
   });
 

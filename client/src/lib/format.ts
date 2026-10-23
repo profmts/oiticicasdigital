@@ -32,6 +32,16 @@ export const maskPhone = (s: string): string => {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
+/** Normaliza um login: minúsculas, sem acento/ç, só letras, números, ponto e sublinhado. */
+export const normUser = (s: string): string => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9_.]/g, '');
+
+/** Gera uma senha simples e legível (sem caracteres ambíguos). */
+export const genPassword = (n = 8): string => {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let s = ''; for (let i = 0; i < n; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+};
+
 /** Máscara de CPF enquanto digita: 000.000.000-00. */
 export const maskCpf = (s: string): string => {
   const d = (s || '').replace(/\D/g, '').slice(0, 11);

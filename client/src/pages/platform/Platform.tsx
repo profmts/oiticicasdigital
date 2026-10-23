@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { get, post, put } from '../../lib/api';
-import { money, parseMoney, centsToInput, dateTime, date } from '../../lib/format';
-import { Badge, Button, Field, Input, Modal, MoneyInput, Select, Spinner, Stat, Textarea, Toggle, useAction, useToast, cx } from '../../components/ui';
+import { money, parseMoney, centsToInput, dateTime, date, normUser, phoneFmt, genPassword } from '../../lib/format';
+
+/** Sugere um login a partir do nome (primeiro nome) ou um padrão. */
+const suggestUser = (name: string, fallback = 'dono') => normUser((name || '').trim().split(' ')[0]) || fallback;
+import { Badge, Button, Field, Input, Modal, MoneyInput, Select, Spinner, Stat, Textarea, Toggle, useAction, useToast, cx, LoginInput, PasswordFields, pwValid, CpfInput, PhoneInput } from '../../components/ui';
 import { PlatformWordmark } from '../../components/brand';
 
 const STATUS: Record<string, { label: string; tone: any }> = { ativo: { label: 'Ativa', tone: 'ok' }, teste: { label: 'Em teste', tone: 'ouro' }, suspenso: { label: 'Suspensa', tone: 'alerta' }, cancelado: { label: 'Cancelada', tone: 'neutral' } };
@@ -140,34 +143,41 @@ export function PlatformTenants() {
 const slugify = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50);
 
 function NewTenant({ plans, onClose, onDone }: { plans: any[]; onClose: () => void; onDone: () => void }) {
-  const [f, setF] = useState({ name: '', slug: '', plan_id: plans[0]?.id ? String(plans[0].id) : '', status: 'ativo', trial_days: '15', document: '', contact_name: '', contact_phone: '', contact_email: '', admin_name: '', admin_user: 'admin', admin_pass: '', tables: '0' });
+  const [f, setF] = useState({ name: '', slug: '', plan_id: plans[0]?.id ? String(plans[0].id) : '', status: 'ativo', trial_days: '15', document: '', contact_name: '', contact_phone: '', contact_email: '', tables: '0' });
+  const [a, setA] = useState({ name: '', user: '', pass: '', pass2: '', cpf: '', phone: '', email: '' });
   const [slugTouched, setSlugTouched] = useState(false);
   const { run, busy } = useAction();
   const up = (k: string) => (e: any) => setF((x) => ({ ...x, [k]: e.target.value, ...(k === 'name' && !slugTouched ? { slug: slugify(e.target.value) } : {}) }));
+  const suggest = suggestUser(a.name);
+  const ok = f.name.length >= 2 && f.slug.length >= 3 && a.name.length >= 2 && pwValid(a.pass, a.pass2);
   return (
     <Modal open onClose={onClose} title="Nova empresa" wide
-      footer={<Button className="w-full" size="lg" busy={!!busy} disabled={f.name.length < 2 || f.slug.length < 3 || f.admin_pass.length < 8 || f.admin_name.length < 2}
+      footer={<Button className="w-full" size="lg" busy={!!busy} disabled={!ok}
         onClick={() => run('c', () => post('/api/platform/tenants', { name: f.name, slug: f.slug, plan_id: f.plan_id ? Number(f.plan_id) : null, status: f.status, trial_days: Number(f.trial_days) || 15,
           document: f.document, contact_name: f.contact_name, contact_phone: f.contact_phone, contact_email: f.contact_email, tables: Number(f.tables) || 0,
-          admin: { name: f.admin_name, username: f.admin_user, password: f.admin_pass } }).then(onDone), 'Empresa criada.')}>Criar empresa</Button>}>
+          admin: { name: a.name, username: a.user.trim() || suggest, password: a.pass, cpf: a.cpf, phone: a.phone, email: a.email } }).then(onDone), 'Empresa criada.')}>Criar empresa</Button>}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Nome da empresa"><Input value={f.name} onChange={up('name')} /></Field>
         <Field label="Endereço do cardápio" hint={`${location.origin}/${f.slug || 'nome-da-empresa'}`}><Input value={f.slug} onChange={(e) => { setSlugTouched(true); setF({ ...f, slug: slugify(e.target.value) }); }} /></Field>
         <Field label="Plano"><Select value={f.plan_id} onChange={up('plan_id')}><option value="">Sem plano</option>{plans.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label="Situação"><Select value={f.status} onChange={up('status')}><option value="ativo">Ativa</option><option value="teste">Período de teste</option></Select></Field>
         {f.status === 'teste' && <Field label="Dias de teste"><Input inputMode="numeric" value={f.trial_days} onChange={up('trial_days')} /></Field>}
-        <Field label="CNPJ/CPF"><Input value={f.document} onChange={up('document')} /></Field>
+        <Field label="CNPJ/CPF da empresa"><Input value={f.document} onChange={up('document')} /></Field>
         <Field label="Responsável"><Input value={f.contact_name} onChange={up('contact_name')} /></Field>
-        <Field label="Telefone"><Input value={f.contact_phone} onChange={up('contact_phone')} /></Field>
-        <Field label="E-mail"><Input type="email" value={f.contact_email} onChange={up('contact_email')} /></Field>
+        <Field label="Telefone da empresa"><Input value={f.contact_phone} onChange={up('contact_phone')} /></Field>
+        <Field label="E-mail da empresa"><Input type="email" value={f.contact_email} onChange={up('contact_email')} /></Field>
         <Field label="Criar mesas numeradas (0 = nenhuma)"><Input inputMode="numeric" value={f.tables} onChange={up('tables')} /></Field>
       </div>
-      <h3 className="mt-5 font-slab text-lg font-bold">Primeiro acesso do administrador da empresa</h3>
-      <div className="mt-2 grid gap-3 sm:grid-cols-3">
-        <Field label="Nome"><Input value={f.admin_name} onChange={up('admin_name')} /></Field>
-        <Field label="Usuário"><Input value={f.admin_user} onChange={up('admin_user')} autoCapitalize="none" /></Field>
-        <Field label="Senha inicial" hint="Mínimo de 8 caracteres."><Input type="password" value={f.admin_pass} onChange={up('admin_pass')} autoComplete="new-password" /></Field>
+      <h3 className="mt-5 font-slab text-lg font-bold">Administrador da empresa (primeira conta)</h3>
+      <p className="mb-2 text-sm text-lenha-600">É a conta que o cliente vai usar para comandar a empresa. A função é sempre Administrador.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Nome completo"><Input value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} /></Field>
+        <Field label="E-mail (opcional)"><Input type="email" value={a.email} onChange={(e) => setA({ ...a, email: e.target.value })} /></Field>
+        <Field label="CPF (opcional)"><CpfInput value={a.cpf} onChange={(v) => setA({ ...a, cpf: v })} /></Field>
+        <Field label="Telefone (opcional)"><PhoneInput value={a.phone} onChange={(v) => setA({ ...a, phone: v })} /></Field>
       </div>
+      <div className="mt-3"><LoginInput value={a.user} onChange={(v) => setA({ ...a, user: v })} suggest={suggest} /></div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2"><PasswordFields pw={a.pass} pw2={a.pass2} setPw={(v) => setA({ ...a, pass: v })} setPw2={(v) => setA({ ...a, pass2: v })} /></div>
     </Modal>
   );
 }
@@ -176,13 +186,14 @@ function NewTenant({ plans, onClose, onDone }: { plans: any[]; onClose: () => vo
 function ReiniciarEmpresa({ tenant, onClose, onDone }: { tenant: any; onClose: () => void; onDone: () => void }) {
   const [confirm, setConfirm] = useState('');
   const [auth, setAuth] = useState({ username: '', password: '' });
-  const [admin, setAdmin] = useState({ name: '', username: 'admin', password: '' });
+  const [admin, setAdmin] = useState({ name: '', username: '', password: '', password2: '' });
   const { run, busy } = useAction();
-  const pronto = confirm.trim().toUpperCase() === 'REINICIAR' && auth.username && auth.password && admin.name.length >= 2 && admin.username.length >= 3 && admin.password.length >= 8;
+  const suggest = suggestUser(admin.name);
+  const pronto = confirm.trim().toUpperCase() === 'REINICIAR' && !!auth.username && !!auth.password && admin.name.length >= 2 && pwValid(admin.password, admin.password2);
   return (
     <Modal open onClose={onClose} title={`Reiniciar ${tenant.name}`} wide
       footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!pronto}
-        onClick={() => run('x', () => post(`/api/platform/tenants/${tenant.id}/reset`, { confirm, auth, admin }).then(onDone), 'Empresa reiniciada.')}>Reiniciar empresa agora</Button>}>
+        onClick={() => run('x', () => post(`/api/platform/tenants/${tenant.id}/reset`, { confirm, auth, admin: { name: admin.name, username: admin.username.trim() || suggest, password: admin.password } }).then(onDone), 'Empresa reiniciada.')}>Reiniciar empresa agora</Button>}>
       <div className="rounded-xl bg-alerta/10 p-3 text-sm text-lenha-700">Isto apaga todos os dados operacionais e a auditoria de <strong>{tenant.name}</strong> e não pode ser desfeito. O cardápio e as configurações são mantidos.</div>
       <div className="mt-4 space-y-3">
         <Field label='Digite REINICIAR para confirmar'><Input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="REINICIAR" /></Field>
@@ -191,12 +202,10 @@ function ReiniciarEmpresa({ tenant, onClose, onDone }: { tenant: any; onClose: (
           <Field label="Usuário da plataforma"><Input value={auth.username} autoCapitalize="none" onChange={(e) => setAuth({ ...auth, username: e.target.value })} /></Field>
           <Field label="Senha"><Input type="password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} /></Field>
         </div>
-        <p className="text-sm font-semibold">Administrador que o cliente vai usar</p>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <Field label="Nome"><Input value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} /></Field>
-          <Field label="Usuário"><Input value={admin.username} autoCapitalize="none" onChange={(e) => setAdmin({ ...admin, username: e.target.value.replace(/\s/g, '') })} /></Field>
-          <Field label="Senha (8+)"><Input type="password" value={admin.password} onChange={(e) => setAdmin({ ...admin, password: e.target.value })} /></Field>
-        </div>
+        <p className="text-sm font-semibold">Administrador que o cliente vai usar (a nova primeira conta)</p>
+        <Field label="Nome completo"><Input value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} /></Field>
+        <LoginInput value={admin.username} onChange={(v) => setAdmin({ ...admin, username: v })} suggest={suggest} />
+        <div className="grid gap-2 sm:grid-cols-2"><PasswordFields pw={admin.password} pw2={admin.password2} setPw={(v) => setAdmin({ ...admin, password: v })} setPw2={(v) => setAdmin({ ...admin, password2: v })} /></div>
       </div>
     </Modal>
   );
@@ -205,66 +214,123 @@ function ReiniciarEmpresa({ tenant, onClose, onDone }: { tenant: any; onClose: (
 function TenantEditor({ tenant, plans, onClose, onDone }: { tenant: any; plans: any[]; onClose: () => void; onDone: () => void }) {
   const [f, setF] = useState({ ...tenant, plan_id: tenant.plan_id ? String(tenant.plan_id) : '', trial_ends_at: tenant.trial_ends_at ? tenant.trial_ends_at.slice(0, 10) : '' });
   const [users, setUsers] = useState<any[]>([]);
-  const [adm, setAdm] = useState({ name: '', username: 'admin', password: '' });
-  const [reset, setReset] = useState<{ user_id: string; password: string }>({ user_id: '', password: '' });
+  const [tab, setTab] = useState<'dados' | 'acessos' | 'suporte' | 'reiniciar'>('dados');
   const [reiniciar, setReiniciar] = useState(false);
   const { run, busy } = useAction();
   const toast = useToast();
-  useEffect(() => { get(`/api/platform/tenants/${tenant.id}/users`).then(setUsers); }, [tenant.id]);
+  const reloadUsers = () => get(`/api/platform/tenants/${tenant.id}/users`).then(setUsers);
+  useEffect(() => { reloadUsers(); }, [tenant.id]); // eslint-disable-line
   const up = (k: string) => (e: any) => setF((x: any) => ({ ...x, [k]: e.target.value }));
   const save = () => run('s', () => put(`/api/platform/tenants/${tenant.id}`, { name: f.name, slug: f.slug, plan_id: f.plan_id ? Number(f.plan_id) : null, status: f.status,
     trial_ends_at: f.trial_ends_at ? new Date(f.trial_ends_at + 'T23:59:59').toISOString() : null, document: f.document, contact_name: f.contact_name, contact_phone: f.contact_phone, contact_email: f.contact_email, notes: f.notes || '' })
     .then((r: any) => { if (r.slug_changed) toast('Endereço alterado: reimprima os QR Codes da empresa.', 'info'); onDone(); }), 'Empresa atualizada.');
   const enter = () => { const reason = prompt('Motivo do acesso de suporte (fica registrado para a empresa):'); if (reason && reason.length >= 3) run('i', () => post(`/api/platform/tenants/${tenant.id}/impersonate`, { reason }).then(() => { location.href = '/admin'; })); };
+  const TABS: [typeof tab, string][] = [['dados', 'Dados'], ['acessos', 'Acessos'], ['suporte', 'Suporte'], ['reiniciar', 'Reiniciar']];
   return (
     <Modal open side onClose={onClose} title={tenant.name}
-      footer={<Button className="w-full" busy={busy === 's'} onClick={save}>Salvar alterações</Button>}>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Nome"><Input value={f.name} onChange={up('name')} /></Field>
-        <Field label="Endereço" hint="Mudar o endereço invalida QR Codes e links já divulgados."><Input value={f.slug} onChange={(e) => setF({ ...f, slug: slugify(e.target.value) })} /></Field>
-        <Field label="Situação"><Select value={f.status} onChange={up('status')}><option value="ativo">Ativa</option><option value="teste">Em teste</option><option value="suspenso">Suspensa (bloqueia acesso e cardápio)</option><option value="cancelado">Cancelada</option></Select></Field>
-        <Field label="Plano"><Select value={f.plan_id} onChange={up('plan_id')}><option value="">Sem plano</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
-        {f.status === 'teste' && <Field label="Teste até"><Input type="date" value={f.trial_ends_at} onChange={up('trial_ends_at')} /></Field>}
-        <Field label="CNPJ/CPF"><Input value={f.document} onChange={up('document')} /></Field>
-        <Field label="Responsável"><Input value={f.contact_name} onChange={up('contact_name')} /></Field>
-        <Field label="Telefone"><Input value={f.contact_phone} onChange={up('contact_phone')} /></Field>
-        <Field label="E-mail"><Input value={f.contact_email} onChange={up('contact_email')} /></Field>
-        <Field label="Anotações internas" className="sm:col-span-2"><Textarea value={f.notes || ''} onChange={up('notes')} /></Field>
+      footer={tab === 'dados' ? <Button className="w-full" busy={busy === 's'} onClick={save}>Salvar alterações</Button> : undefined}>
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {TABS.map(([t, label]) => (
+          <button key={t} onClick={() => setTab(t)} className={cx('h-9 rounded-xl px-3.5 text-sm font-semibold', tab === t ? (t === 'reiniciar' ? 'bg-alerta text-white' : 'bg-lenha-900 text-white') : 'bg-lenha-50 text-lenha-600 hover:bg-lenha-100')}>{label}</button>
+        ))}
       </div>
-      <section className="mt-6 rounded-2xl bg-white p-4 ring-1 ring-lenha-100">
-        <h3 className="font-slab text-lg font-bold">Acessos da empresa</h3>
-        {users.length === 0 ? <p className="text-sm text-alerta">A empresa ainda não tem usuários. Crie o administrador abaixo.</p> : (
-          <ul className="mt-2 text-sm">{users.map((u) => <li key={u.id} className={cx(!u.active && 'opacity-50')}>{u.name} · @{u.username} · {u.role}</li>)}</ul>
-        )}
-        <p className="mt-3 text-sm font-semibold">Criar administrador</p>
-        <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
-          <Input placeholder="Nome" value={adm.name} onChange={(e) => setAdm({ ...adm, name: e.target.value })} aria-label="Nome do administrador" />
-          <Input placeholder="Usuário" value={adm.username} onChange={(e) => setAdm({ ...adm, username: e.target.value })} aria-label="Usuário" />
-          <Input placeholder="Senha (8+)" type="password" value={adm.password} onChange={(e) => setAdm({ ...adm, password: e.target.value })} aria-label="Senha" />
-          <Button variant="outline" disabled={adm.name.length < 2 || adm.password.length < 8} busy={busy === 'a'} onClick={() => run('a', () => post(`/api/platform/tenants/${tenant.id}/admins`, adm).then(() => get(`/api/platform/tenants/${tenant.id}/users`).then(setUsers)), 'Administrador criado.')}>Criar</Button>
-        </div>
-        {users.length > 0 && <>
-          <p className="mt-4 text-sm font-semibold">Redefinir senha</p>
-          <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <Select value={reset.user_id} onChange={(e) => setReset({ ...reset, user_id: e.target.value })} aria-label="Usuário"><option value="">Escolha o usuário</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name} (@{u.username})</option>)}</Select>
-            <Input type="password" placeholder="Nova senha (8+)" value={reset.password} onChange={(e) => setReset({ ...reset, password: e.target.value })} aria-label="Nova senha" />
-            <Button variant="outline" disabled={!reset.user_id || reset.password.length < 8} busy={busy === 'r'} onClick={() => run('r', () => post(`/api/platform/tenants/${tenant.id}/reset-password`, { user_id: Number(reset.user_id), password: reset.password }).then(() => setReset({ user_id: '', password: '' })), 'Senha redefinida.')}>Redefinir</Button>
-          </div>
-        </>}
-      </section>
-      <section className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-lenha-100">
-        <h3 className="font-slab text-lg font-bold">Suporte</h3>
-        <p className="text-sm text-lenha-600">Entra no painel da empresa como administrador por até 4 horas. O acesso fica registrado na auditoria da empresa.</p>
-        <Button className="mt-2" variant="dark" busy={busy === 'i'} onClick={enter}>Acessar painel da empresa</Button>
-      </section>
 
-      <section className="mt-4 rounded-2xl border-2 border-alerta/40 bg-alerta/5 p-4">
-        <h3 className="font-slab text-lg font-bold text-alerta">Reiniciar empresa</h3>
-        <p className="text-sm text-lenha-600">Apaga <strong>todos</strong> os pedidos, pagamentos, caixas, entregas, clientes e a auditoria da empresa, e remove a equipe, deixando só um administrador novo. <strong>Mantém</strong> o cardápio, a logo, as cores e as configurações. Use ao entregar o sistema para o cliente. Não dá para desfazer.</p>
-        <Button className="mt-2" variant="danger" onClick={() => setReiniciar(true)}>Reiniciar esta empresa</Button>
-      </section>
+      {tab === 'dados' && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Nome"><Input value={f.name} onChange={up('name')} /></Field>
+          <Field label="Endereço" hint="Mudar o endereço invalida QR Codes e links já divulgados."><Input value={f.slug} onChange={(e) => setF({ ...f, slug: slugify(e.target.value) })} /></Field>
+          <Field label="Situação"><Select value={f.status} onChange={up('status')}><option value="ativo">Ativa</option><option value="teste">Em teste</option><option value="suspenso">Suspensa (bloqueia acesso e cardápio)</option><option value="cancelado">Cancelada</option></Select></Field>
+          <Field label="Plano"><Select value={f.plan_id} onChange={up('plan_id')}><option value="">Sem plano</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+          {f.status === 'teste' && <Field label="Teste até"><Input type="date" value={f.trial_ends_at} onChange={up('trial_ends_at')} /></Field>}
+          <Field label="CNPJ/CPF"><Input value={f.document} onChange={up('document')} /></Field>
+          <Field label="Responsável"><Input value={f.contact_name} onChange={up('contact_name')} /></Field>
+          <Field label="Telefone"><Input value={f.contact_phone} onChange={up('contact_phone')} /></Field>
+          <Field label="E-mail"><Input value={f.contact_email} onChange={up('contact_email')} /></Field>
+          <Field label="Anotações internas" className="sm:col-span-2"><Textarea value={f.notes || ''} onChange={up('notes')} /></Field>
+        </div>
+      )}
+
+      {tab === 'acessos' && <AcessosTab tenantId={tenant.id} users={users} reload={reloadUsers} />}
+
+      {tab === 'suporte' && (
+        <section className="rounded-2xl bg-white p-4 ring-1 ring-lenha-100">
+          <h3 className="font-slab text-lg font-bold">Acesso de suporte</h3>
+          <p className="mt-1 text-sm text-lenha-600">Entra no painel da empresa como administrador por até 4 horas. O acesso fica registrado na auditoria da empresa.</p>
+          <Button className="mt-3" variant="dark" busy={busy === 'i'} onClick={enter}>Acessar painel da empresa</Button>
+        </section>
+      )}
+
+      {tab === 'reiniciar' && (
+        <section className="rounded-2xl border-2 border-alerta/40 bg-alerta/5 p-4">
+          <h3 className="font-slab text-lg font-bold text-alerta">Reiniciar empresa</h3>
+          <p className="mt-1 text-sm text-lenha-600">Apaga <strong>todos</strong> os pedidos, pagamentos, caixas, entregas, clientes e a auditoria da empresa, e remove a equipe, deixando só um administrador novo. <strong>Mantém</strong> o cardápio, a logo, as cores e as configurações. Use ao entregar o sistema para o cliente. Não dá para desfazer.</p>
+          <Button className="mt-3" variant="danger" onClick={() => setReiniciar(true)}>Reiniciar esta empresa</Button>
+        </section>
+      )}
       {reiniciar && <ReiniciarEmpresa tenant={tenant} onClose={() => setReiniciar(false)} onDone={() => { setReiniciar(false); onDone(); }} />}
     </Modal>
+  );
+}
+
+const ROLE_PT: Record<string, string> = { admin: 'Administrador', gerente: 'Gerente', caixa: 'Caixa', garcom: 'Garçom', cozinha: 'Cozinha', motoboy: 'Motoboy' };
+
+/** Aba Acessos: lista de usuários com redefinir senha por linha + adicionar administrador. */
+function AcessosTab({ tenantId, users, reload }: { tenantId: number; users: any[]; reload: () => void }) {
+  const { run, busy } = useAction();
+  const [resetId, setResetId] = useState<number | null>(null);
+  const [resetPw, setResetPw] = useState('');
+  const [showReset, setShowReset] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [a, setA] = useState({ name: '', user: '', pass: '', pass2: '', cpf: '', phone: '', email: '' });
+  const suggest = suggestUser(a.name);
+  const doReset = (uid: number) => run('rp', () => post(`/api/platform/tenants/${tenantId}/reset-password`, { user_id: uid, password: resetPw }).then(() => { setResetId(null); setResetPw(''); }), 'Senha redefinida.');
+  const createAdmin = () => run('ad', () => post(`/api/platform/tenants/${tenantId}/admins`, { name: a.name, username: a.user.trim() || suggest, password: a.pass, cpf: a.cpf, phone: a.phone, email: a.email })
+    .then(() => { setA({ name: '', user: '', pass: '', pass2: '', cpf: '', phone: '', email: '' }); setAddOpen(false); reload(); }), 'Administrador criado.');
+  return (
+    <div>
+      <p className="mb-2 text-sm font-semibold text-lenha-500">ACESSOS DA EMPRESA</p>
+      {users.length === 0 && <p className="mb-3 rounded-lg bg-ouro-300/40 px-3 py-2 text-sm">A empresa ainda não tem usuários. Adicione o administrador abaixo.</p>}
+      <ul className="space-y-2">
+        {users.map((u) => (
+          <li key={u.id} className={cx('rounded-xl p-3 ring-1 ring-lenha-100', !u.active && 'opacity-50')}>
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brasa-50 font-bold text-brasa-600">{(u.name || '?')[0].toUpperCase()}</span>
+              <div className="min-w-0 flex-1"><p className="truncate font-semibold">{u.name}</p><p className="text-xs text-lenha-500">usuário: {u.username}{u.phone ? ` · ${phoneFmt(u.phone)}` : ''}</p></div>
+              <Badge tone={u.role === 'admin' ? 'brasa' : 'neutral'}>{ROLE_PT[u.role] || u.role}</Badge>
+              <button className="text-sm font-semibold text-brasa-700 hover:underline" onClick={() => { setResetId(resetId === u.id ? null : u.id); setResetPw(''); }}>Redefinir senha</button>
+            </div>
+            {resetId === u.id && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-lenha-100 pt-3">
+                <Input type={showReset ? 'text' : 'password'} value={resetPw} onChange={(e) => setResetPw(e.target.value)} placeholder="Nova senha (8+)" className="min-w-[160px] flex-1" />
+                <button type="button" onClick={() => setShowReset((s) => !s)} className="h-11 rounded-xl border border-lenha-200 bg-lenha-50 px-3 text-sm font-semibold">{showReset ? 'Ocultar' : 'Mostrar'}</button>
+                <button type="button" onClick={() => { const g = genPassword(); setResetPw(g); setShowReset(true); }} className="text-sm font-semibold text-brasa-600 underline">Gerar</button>
+                <Button size="sm" busy={busy === 'rp'} disabled={resetPw.length < 8} onClick={() => doReset(u.id)}>Salvar senha</Button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {!addOpen ? (
+        <button className="mt-3 w-full rounded-xl border border-dashed border-lenha-200 py-3 font-semibold text-brasa-700" onClick={() => setAddOpen(true)}>+ Adicionar administrador</button>
+      ) : (
+        <div className="mt-3 rounded-2xl bg-lenha-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-lenha-500">NOVO ADMINISTRADOR</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nome completo"><Input value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} /></Field>
+            <Field label="E-mail (opcional)"><Input type="email" value={a.email} onChange={(e) => setA({ ...a, email: e.target.value })} /></Field>
+            <Field label="CPF (opcional)"><CpfInput value={a.cpf} onChange={(v) => setA({ ...a, cpf: v })} /></Field>
+            <Field label="Telefone (opcional)"><PhoneInput value={a.phone} onChange={(v) => setA({ ...a, phone: v })} /></Field>
+          </div>
+          <div className="mt-3"><LoginInput value={a.user} onChange={(v) => setA({ ...a, user: v })} suggest={suggest} /></div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2"><PasswordFields pw={a.pass} pw2={a.pass2} setPw={(v) => setA({ ...a, pass: v })} setPw2={(v) => setA({ ...a, pass2: v })} /></div>
+          <div className="mt-3 flex gap-2">
+            <Button busy={busy === 'ad'} disabled={a.name.length < 2 || !pwValid(a.pass, a.pass2)} onClick={createAdmin}>Criar administrador</Button>
+            <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
