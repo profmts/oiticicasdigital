@@ -157,7 +157,7 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
         </div>
       )}
 
-      <ProductModal product={open} type={type} onClose={() => setOpen(null)} onAdd={(l) => setCart((c) => [...c, l])} />
+      <ProductModal product={open} type={type} hideNotes onClose={() => setOpen(null)} onAdd={(l) => setCart((c) => [...c, l])} />
       {checkout && mode === 'online' && <Checkout slug={slug} data={data} type={type as any} setType={setType} cart={cart} setCart={setCart} invalid={invalid} onClose={() => setCheckout(false)} />}
       {checkout && mode !== 'online' && <InHouseCheckout slug={slug} token={token} mode={mode} accepting={!!accepting} cart={cart} setCart={setCart} invalid={invalid}
         onClose={() => setCheckout(false)} onSent={() => { fetchTable(); }} />}
