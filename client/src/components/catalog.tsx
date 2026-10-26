@@ -22,7 +22,7 @@ export function priceLabel(p: any, type: string) {
 }
 
 /** Montagem do item: variação, opções obrigatórias/adicionais, quantidade e observação. */
-export function ProductModal({ product, type, onClose, onAdd, cta = 'Adicionar' }: { product: any | null; type: string; onClose: () => void; onAdd: (l: CartLine) => void; cta?: string }) {
+export function ProductModal({ product, type, onClose, onAdd, cta = 'Adicionar', hideNotes = false }: { product: any | null; type: string; onClose: () => void; onAdd: (l: CartLine) => void; cta?: string; hideNotes?: boolean }) {
   const vs = product ? variantsFor(product, type) : [];
   const [variantId, setVariantId] = useState<number | null>(null);
   const [sel, setSel] = useState<Record<number, number[]>>({});
@@ -92,10 +92,12 @@ export function ProductModal({ product, type, onClose, onAdd, cta = 'Adicionar' 
           </div>
         </fieldset>
       ))}
-      <label className="block">
-        <span className="mb-1 block font-semibold">Observação <span className="text-sm font-normal text-lenha-500">(opcional)</span></span>
-        <Textarea value={notes} maxLength={200} onChange={(e) => setNotes(e.target.value)} placeholder="Ex.: bem passado, sem cebola" />
-      </label>
+      {!hideNotes && (
+        <label className="block">
+          <span className="mb-1 block font-semibold">Observação <span className="text-sm font-normal text-lenha-500">(opcional)</span></span>
+          <Textarea value={notes} maxLength={200} onChange={(e) => setNotes(e.target.value)} placeholder="Ex.: bem passado, sem cebola" />
+        </label>
+      )}
       {tried && missing.length > 0 && <p className="mt-3 text-sm font-semibold text-alerta">Falta escolher {missing.join(' e ')}.</p>}
     </Modal>
   );
