@@ -26,6 +26,8 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
   const [comanda, setComanda] = useState(false);
   const [activeCat, setActiveCat] = useState<number | null>(null);
   const sections = useRef<Record<number, HTMLElement | null>>({});
+  const hadComanda = useRef(false);
+  const [ended, setEnded] = useState(false);
 
   const fetchMenu = useCallback(() => get(`/api/public/${slug}/menu`).then(setData).catch((e) => setErr(e.message)), [slug]);
   const fetchTable = useCallback(() => mode === 'mesa' ? get(`/api/public/${slug}/tables/${token}`).then(setTable).catch((e) => setErr(e.message)) : Promise.resolve(), [slug, token, mode]);
@@ -33,6 +35,11 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
   useEffect(() => save(cartKey, cart), [cart, cartKey]);
   useEffect(() => { if (mode === 'online') save(`od_type_${slug}`, type); }, [type, slug, mode]);
   useEffect(() => { if (data?.settings?.store_name) document.title = `${data.settings.store_name} · Cardápio`; }, [data]);
+  useEffect(() => {
+    if (mode !== 'mesa' || !table) return;
+    if (table.comanda) { hadComanda.current = true; setEnded(false); }
+    else if (hadComanda.current) setEnded(true);
+  }, [table, mode]);
   useEffect(() => {
     const st = data?.settings; if (!st || mode !== 'online') return;
     if (type === 'delivery' && !st.accept_delivery && st.accept_pickup) setType('retirada');
@@ -46,6 +53,17 @@ export default function Menu({ mode = 'online' }: { mode?: Mode }) {
   if (!data || (mode === 'mesa' && !table)) return <Spinner label="Abrindo o cardápio…" />;
   const s = data.settings;
   const accepting = mode === 'online' ? s.is_open : mode === 'mesa' ? table.enabled : s.self_order_counter_enabled;
+
+  if (mode === 'mesa' && ended) {
+    return (
+      <div style={tenantTheme(s)} className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-papel px-6 text-center text-lenha-900">
+        <TenantLogo url={data.tenant?.logo_url} name={s.store_name || ''} className="size-20 rounded-2xl bg-white object-contain shadow" />
+        <h1 className="font-slab text-3xl font-bold">Conta encerrada</h1>
+        <p className="max-w-sm text-lenha-600">A conta da mesa {table.table.label} foi finalizada. Obrigado pela visita!</p>
+        <Button size="lg" onClick={() => { setCart([]); hadComanda.current = false; setEnded(false); setComanda(false); setCheckout(false); fetchTable(); }}>Fazer um novo pedido</Button>
+      </div>
+    );
+  }
 
   const norm = (x: string) => x.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
   const cats = data.categories.map((c: any) => ({ ...c, products: c.products.filter((p: any) => variantsFor(p, type).length && (!q || norm(p.name + ' ' + p.description).includes(norm(q)))) })).filter((c: any) => c.products.length);
