@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, authorize, audit, broadcast, sseSubscribe, getSetting, type SessionUser } from '../core.js';
 import * as O from '../services/orders.js';
 import * as C from '../services/cash.js';
+import * as F from '../services/fiscal.js';
 
 export const opsRouter = Router();
 opsRouter.use(requireAuth);
@@ -210,6 +211,33 @@ opsRouter.post('/payments/:id/void', h(async (req) => {
   const p = z.object({ reason: z.string().min(3).max(300), auth: authSchema }).parse(req.body);
   const by = await authorize(req, 'payments.void', p.auth);
   const o = await C.voidPayment(req.db, T(req), id(req), req.user!, p.reason, by, req.ip);
+  return O.orderDetail(req.db, T(req), o.id, req.user);
+}));
+
+// ---------- Nota fiscal (NFC-e) do pedido ----------
+async function fiscalItems(req: Request, orderId: number) {
+  return req.db.all(`SELECT i.name, i.qty, i.unit_price_cents, i.total_cents, i.product_id, p.ncm, p.cfop, p.origem, p.tax_class
+    FROM order_items i LEFT JOIN products p ON p.id = i.product_id WHERE i.order_id = $1 AND i.status <> 'cancelado' ORDER BY i.id`, [orderId]);
+}
+opsRouter.post('/orders/:id/nfce', requirePerm('payments.receive', 'orders.manage'), h(async (req) => {
+  const { cpf } = z.object({ cpf: z.string().max(14).nullable().optional() }).parse(req.body || {});
+  const o = await loadForUser(req, id(req));
+  const items = await fiscalItems(req, o.id);
+  const payments = await req.db.all('SELECT method, amount_cents FROM payments WHERE order_id = $1 AND NOT voided', [o.id]);
+  await F.emitNfce(req.db, T(req), { id: o.id, number: o.number, total_cents: o.total_cents, subtotal_cents: o.subtotal_cents, discount_cents: o.discount_cents, payments }, items, cpf ?? null);
+  broadcast(T(req), 'orders');
+  return O.orderDetail(req.db, T(req), o.id, req.user);
+}));
+opsRouter.post('/orders/:id/nfce/refresh', requirePerm('payments.receive', 'orders.manage'), h(async (req) => {
+  const o = await loadForUser(req, id(req));
+  await F.refreshNfce(req.db, T(req), o.id);
+  return O.orderDetail(req.db, T(req), o.id, req.user);
+}));
+opsRouter.post('/orders/:id/nfce/cancel', requirePerm('payments.receive', 'orders.manage'), h(async (req) => {
+  const { justificativa } = z.object({ justificativa: z.string().min(15).max(255) }).parse(req.body);
+  const o = await loadForUser(req, id(req));
+  await F.cancelNfce(req.db, T(req), o.id, justificativa);
+  broadcast(T(req), 'orders');
   return O.orderDetail(req.db, T(req), o.id, req.user);
 }));
 

@@ -145,6 +145,8 @@ export function OrderDrawer({ orderId, onClose }: { orderId: number | null; onCl
             </section>
           )}
 
+          <NotaFiscal order={o} enabled={!!settings?.fiscal_enabled} onDone={(x: any) => setO(x)} />
+
           <section>
             <h3 className="mb-2 font-slab text-lg font-bold">Histórico</h3>
             <ol className="space-y-1.5 text-sm">
@@ -177,6 +179,56 @@ export function OrderDrawer({ orderId, onClose }: { orderId: number | null; onCl
 }
 
 const ITEM_STATUS: Record<string, string> = { pendente: 'não enviado', enviado: 'na fila da cozinha', preparo: 'em preparo', pronto: 'pronto', entregue: 'entregue', cancelado: 'cancelado' };
+
+// Nota fiscal (NFC-e) do pedido: status, emitir, atualizar, cancelar.
+function NotaFiscal({ order, enabled, onDone }: { order: any; enabled: boolean; onDone: (o: any) => void }) {
+  const { run, busy } = useAction();
+  const [emitOpen, setEmitOpen] = useState(false);
+  const [cpf, setCpf] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [just, setJust] = useState('');
+  const n = order.nfce;
+  if (!enabled && !n) return null;
+  const emit = () => run('emit', () => post(`/api/orders/${order.id}/nfce`, { cpf: cpf.replace(/\D/g, '') || null }).then((x) => { setEmitOpen(false); setCpf(''); onDone(x); }), 'Nota enviada para a SEFAZ.');
+  const refresh = () => run('ref', () => post(`/api/orders/${order.id}/nfce/refresh`).then(onDone), 'Status da nota atualizado.');
+  const doCancel = () => run('canc', () => post(`/api/orders/${order.id}/nfce/cancel`, { justificativa: just }).then((x) => { setCancelOpen(false); setJust(''); onDone(x); }), 'Nota cancelada.');
+  const st = n?.status;
+  const tone = st === 'autorizada' ? 'ok' : st === 'cancelada' ? 'neutral' : (st === 'rejeitada' || st === 'erro') ? 'alerta' : 'ouro';
+  const label = st === 'autorizada' ? 'Autorizada' : st === 'cancelada' ? 'Cancelada' : st === 'rejeitada' ? 'Rejeitada' : st === 'erro' ? 'Erro' : st === 'processando' ? 'Processando' : 'Enviando';
+  return (
+    <section>
+      <h3 className="mb-2 font-slab text-lg font-bold">Nota fiscal (NFC-e)</h3>
+      <div className="rounded-2xl bg-white p-4 text-sm ring-1 ring-lenha-100">
+        {!n && <p className="text-lenha-600">Nenhuma nota emitida para este pedido.</p>}
+        {n && (
+          <div className="space-y-1">
+            <p className="flex items-center gap-2"><Badge tone={tone as any}>{label}</Badge>{n.ambiente === 'homolog' && <span className="text-lenha-500">ambiente de teste</span>}</p>
+            {n.numero && <p>Nº {n.numero}{n.serie ? ` · série ${n.serie}` : ''}</p>}
+            {n.chave && <p className="break-all text-xs text-lenha-500">Chave {n.chave}</p>}
+            {n.cpf && <p>CPF na nota: {n.cpf}</p>}
+            {n.message && (st === 'rejeitada' || st === 'erro') && <p className="text-alerta">{n.message}</p>}
+          </div>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {enabled && (!n || st === 'rejeitada' || st === 'erro') && <Button size="sm" onClick={() => setEmitOpen(true)}>Emitir nota fiscal</Button>}
+          {n && st === 'processando' && <Button size="sm" variant="outline" busy={busy === 'ref'} onClick={refresh}>Atualizar status</Button>}
+          {n && st === 'autorizada' && n.danfe_url && <a href={n.danfe_url} target="_blank" className="inline-flex h-9 items-center rounded-xl border border-lenha-200 bg-white px-3 text-sm font-semibold">Imprimir nota (DANFE)</a>}
+          {n && st === 'autorizada' && <Button size="sm" variant="ghost" className="text-alerta" onClick={() => setCancelOpen(true)}>Cancelar nota</Button>}
+        </div>
+      </div>
+      <Modal open={emitOpen} onClose={() => setEmitOpen(false)} title="Emitir nota fiscal (NFC-e)"
+        footer={<Button className="w-full" busy={busy === 'emit'} onClick={emit}>Emitir nota</Button>}>
+        <p className="mb-3 text-sm text-lenha-600">O CPF na nota é opcional. Deixe em branco para nota sem identificação do consumidor.</p>
+        <Field label="CPF na nota (opcional)"><Input value={cpf} inputMode="numeric" placeholder="000.000.000-00" onChange={(e) => setCpf(e.target.value)} /></Field>
+      </Modal>
+      <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancelar nota fiscal"
+        footer={<Button className="w-full" variant="danger" busy={busy === 'canc'} disabled={just.trim().length < 15} onClick={doCancel}>Cancelar nota na SEFAZ</Button>}>
+        <p className="mb-3 text-sm text-lenha-600">O cancelamento só vale dentro do prazo legal. Explique o motivo (mínimo 15 caracteres).</p>
+        <Field label="Justificativa"><Textarea value={just} maxLength={255} onChange={(e) => setJust(e.target.value)} placeholder="Ex.: venda cancelada pelo cliente antes da entrega" /></Field>
+      </Modal>
+    </section>
+  );
+}
 
 function FeeEditor({ order, onDone }: { order: any; onDone: (o: any) => void }) {
   const [v, setV] = useState('');
