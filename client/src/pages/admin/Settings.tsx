@@ -142,6 +142,8 @@ export default function Settings() {
         </div>
       </Section>
 
+      <FiscalSection />
+
       <BackupSection />
 
       <Section title="Redefinir configurações" desc="Volta os ajustes de funcionamento, pagamentos, cozinha, banners e identidade visual para o padrão de fábrica. Mantém o nome, contatos, endereço, fuso, PIN e chave Pix da empresa. NÃO apaga pedidos, clientes, produtos nem caixa.">
@@ -167,6 +169,38 @@ export default function Settings() {
         </form>
       </Modal>
     </div>
+  );
+}
+
+// Configuração fiscal (NFC-e). Endpoint próprio, salvo com botão próprio.
+function FiscalSection() {
+  const { data, reload } = useData<any>('/api/admin/settings/fiscal', ['settings'], 0);
+  const [f, setF] = useState<any>(null);
+  const { run, busy } = useAction();
+  useEffect(() => { if (data) setF(data); }, [data]);
+  if (!f) return null;
+  const set = (k: string, v: any) => setF((x: any) => ({ ...x, [k]: v }));
+  const save = () => run('fisc', () => put('/api/admin/settings/fiscal', {
+    enabled: !!f.enabled, ambiente: f.ambiente || 'homolog', cnpj: f.cnpj || '', ie: f.ie || '', regime: f.regime || 'simples',
+    csc: f.csc || '', csc_id: f.csc_id || '', token: f.token || '',
+  }).then(reload), 'Dados fiscais salvos.');
+  return (
+    <Section title="Fiscal e impostos (NFC-e)" desc="Emissão de nota fiscal ao consumidor. Cada loja usa os próprios dados e certificado. A nota é emitida por uma API fiscal (Focus NFe), que já segue as regras novas de IBS e CBS.">
+      <div className="space-y-3">
+        <Toggle checked={!!f.enabled} onChange={(v) => set('enabled', v)} label="Emitir nota fiscal (NFC-e) nesta loja" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="CNPJ"><Input value={f.cnpj || ''} onChange={(e) => set('cnpj', e.target.value)} placeholder="00.000.000/0000-00" /></Field>
+          <Field label="Inscrição Estadual"><Input value={f.ie || ''} onChange={(e) => set('ie', e.target.value)} /></Field>
+          <Field label="Regime tributário"><Select value={f.regime || 'simples'} onChange={(e) => set('regime', e.target.value)}><option value="simples">Simples Nacional</option><option value="mei">MEI</option><option value="normal">Regime normal</option></Select></Field>
+          <Field label="Ambiente"><Select value={f.ambiente || 'homolog'} onChange={(e) => set('ambiente', e.target.value)}><option value="homolog">Teste (homologação)</option><option value="producao">Produção (nota válida)</option></Select></Field>
+          <Field label="CSC (código de segurança)"><Input value={f.csc || ''} onChange={(e) => set('csc', e.target.value)} /></Field>
+          <Field label="ID do CSC"><Input value={f.csc_id || ''} onChange={(e) => set('csc_id', e.target.value)} /></Field>
+          <Field label="Token da API fiscal"><Input value={f.token || ''} onChange={(e) => set('token', e.target.value)} placeholder="cole o token da Focus NFe" /></Field>
+        </div>
+        <p className="rounded-lg bg-lenha-50 px-3 py-2 text-sm text-lenha-600">O certificado digital A1 da loja é enviado na própria API fiscal. Comece no ambiente de Teste e mude para Produção quando estiver tudo certo. O cálculo do imposto é feito pela API, nunca fixo no sistema.</p>
+        <Button busy={busy === 'fisc'} onClick={save}>Salvar dados fiscais</Button>
+      </div>
+    </Section>
   );
 }
 

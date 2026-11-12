@@ -522,10 +522,11 @@ export async function orderDetail(q: Q, t: number, id: number, user?: SessionUse
   const extra = await q.get(`SELECT tb.label table_label, w.name waiter_name, c.name courier_name, cb.name created_by_name
     FROM orders o LEFT JOIN dining_tables tb ON tb.id = o.table_id LEFT JOIN users w ON w.id = o.waiter_id LEFT JOIN users c ON c.id = o.courier_id
     LEFT JOIN users cb ON cb.id = o.created_by WHERE o.id = $1`, [id]);
+  const nfce = await q.get('SELECT id, status, numero, serie, chave, protocolo, danfe_url, qrcode_url, cpf, ambiente, message, updated_at FROM nfce WHERE order_id = $1 ORDER BY id DESC LIMIT 1', [id]);
   const full: any = {
     ...o, ...extra, address: o.address_json, events: events.map((e) => ({ ...e, note: e.note?.replace(/ \[[^\]]+\]$/, '') })),
     items: items.map((i) => ({ ...i, options: i.options_json, created_by_name: i.created_by_name || (i.source === 'cliente' ? `Cliente${i.customer_label ? ` ${i.customer_label}` : ''} (QR)` : null) })),
-    tickets, payments, status_label: STATUS_LABELS[o.status],
+    tickets, payments, nfce: nfce || null, status_label: STATUS_LABELS[o.status],
   };
   if (user && !can(user, 'orders.view_values') && !can(user, 'tables.use')) return stripValues(full);
   return full;

@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import QRCode from 'qrcode';
-import { h, bad, notFound, conflict, requirePerm, audit, broadcast, getSettings, getSetting, confirmPassword, HttpError, tenantBySlug, tenantActive, feature, rateLimit, type TenantCtx } from '../core.js';
+import { h, bad, notFound, conflict, requirePerm, audit, broadcast, getSettings, getSetting, confirmPassword, HttpError, tenantBySlug, tenantActive, feature, rateLimit, digits, type TenantCtx } from '../core.js';
 import { config } from '../config.js';
 import type { Q } from '../db.js';
 import { createOrder, selfOrderTable, STATUS_LABELS, event } from '../services/orders.js';
@@ -179,6 +179,8 @@ const productSchema = z.object({
   image_url: z.string().max(300).nullable().optional(), sector: z.string().max(30).nullable().optional(),
   active: z.boolean().default(true), online: z.boolean().default(true), featured: z.boolean().default(false),
   order_types: z.array(z.enum(TYPES as [string, ...string[]])).min(1), sort: z.number().int().default(0),
+  ncm: z.string().max(10).nullable().optional(), cfop: z.string().max(4).nullable().optional(),
+  origem: z.string().max(1).default('0'), tax_class: z.enum(['normal', 'reduzido', 'isento']).default('normal'),
   variants: z.array(z.object({ id: z.number().int().optional(), name: z.string().min(1).max(40), price_cents: z.number().int().min(0).max(10000000), active: z.boolean().default(true), order_types: z.array(z.string()).nullable().optional() })).min(1),
   option_groups: z.array(z.object({ id: z.number().int().optional(), name: z.string().min(1).max(40), min_select: z.number().int().min(0).max(20), max_select: z.number().int().min(1).max(20),
     options: z.array(z.object({ id: z.number().int().optional(), name: z.string().min(1).max(60), price_cents: z.number().int().min(0).max(1000000), active: z.boolean().default(true) })).min(1) })).default([]),
@@ -190,15 +192,19 @@ async function saveProduct(req: Request, id: number | null, p: z.infer<typeof pr
   return req.db.tx(async (q) => {
     if (!(await q.get('SELECT 1 FROM categories WHERE id = $1 AND tenant_id = $2', [p.category_id, t]))) throw bad('Categoria inválida.');
     for (const g of p.option_groups) if (g.min_select > g.max_select) throw bad(`Grupo ${g.name}: mínimo maior que o máximo.`);
+    const ncm = p.ncm ? digits(p.ncm).slice(0, 8) || null : null;
+    const cfop = p.cfop ? digits(p.cfop).slice(0, 4) || null : null;
+    const origem = (p.origem || '0').slice(0, 1);
+    const taxClass = p.tax_class || 'normal';
     let before: any = null;
     if (id) {
       before = await q.get('SELECT * FROM products WHERE id = $1 AND tenant_id = $2', [id, t]);
       if (!before) throw notFound('Produto não encontrado.');
-      await q.run(`UPDATE products SET category_id=$1, name=$2, description=$3, image_url=$4, sector=$5, active=$6, online=$7, featured=$8, order_types=$9, sort=$10, updated_at=NOW(3) WHERE id=$11`,
-        [p.category_id, p.name, p.description, p.image_url ?? null, p.sector || null, p.active, p.online, p.featured, p.order_types.join(','), p.sort, id]);
+      await q.run(`UPDATE products SET category_id=$1, name=$2, description=$3, image_url=$4, sector=$5, active=$6, online=$7, featured=$8, order_types=$9, sort=$10, ncm=$11, cfop=$12, origem=$13, tax_class=$14, updated_at=NOW(3) WHERE id=$15`,
+        [p.category_id, p.name, p.description, p.image_url ?? null, p.sector || null, p.active, p.online, p.featured, p.order_types.join(','), p.sort, ncm, cfop, origem, taxClass, id]);
     } else {
-      id = (await q.get(`INSERT INTO products (tenant_id, category_id, name, description, image_url, sector, active, online, featured, order_types, sort) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-        [t, p.category_id, p.name, p.description, p.image_url ?? null, p.sector || null, p.active, p.online, p.featured, p.order_types.join(','), p.sort])).id;
+      id = (await q.get(`INSERT INTO products (tenant_id, category_id, name, description, image_url, sector, active, online, featured, order_types, sort, ncm, cfop, origem, tax_class) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+        [t, p.category_id, p.name, p.description, p.image_url ?? null, p.sector || null, p.active, p.online, p.featured, p.order_types.join(','), p.sort, ncm, cfop, origem, taxClass])).id;
     }
     // variações preservam ids (o histórico de vendas aponta para elas); removidas ficam inativas
     const oldVars = await q.all('SELECT * FROM product_variants WHERE product_id = $1', [id]);
@@ -239,6 +245,15 @@ async function saveProduct(req: Request, id: number | null, p: z.infer<typeof pr
 
 catalogRouter.post('/products', requirePerm('products.manage'), h(async (req) => { const id = await saveProduct(req, null, productSchema.parse(req.body)); broadcast(T(req), 'catalog'); return { id }; }));
 catalogRouter.put('/products/:id', requirePerm('products.manage'), h(async (req) => { const id = await saveProduct(req, Number(req.params.id), productSchema.parse(req.body)); broadcast(T(req), 'catalog'); return { id }; }));
+// Aplicar os mesmos dados fiscais a todos os produtos de uma categoria.
+catalogRouter.post('/products/fiscal-category', requirePerm('products.manage'), h(async (req) => {
+  const b = z.object({ category_id: z.number().int(), ncm: z.string().max(10).nullable().optional(), cfop: z.string().max(4).nullable().optional(), origem: z.string().max(1).default('0'), tax_class: z.enum(['normal', 'reduzido', 'isento']).default('normal') }).parse(req.body);
+  const ncm = b.ncm ? digits(b.ncm).slice(0, 8) || null : null;
+  const cfop = b.cfop ? digits(b.cfop).slice(0, 4) || null : null;
+  const r = await req.db.run('UPDATE products SET ncm=$1, cfop=$2, origem=$3, tax_class=$4, updated_at=NOW(3) WHERE category_id=$5 AND tenant_id=$6 AND deleted_at IS NULL', [ncm, cfop, (b.origem || '0').slice(0, 1), b.tax_class, b.category_id, T(req)]);
+  broadcast(T(req), 'catalog');
+  return { updated: r.rowCount };
+}));
 catalogRouter.patch('/products/:id/toggle', requirePerm('products.manage', 'pdv.use'), h(async (req) => {
   const { active } = z.object({ active: z.boolean() }).parse(req.body);
   const r = await req.db.run('UPDATE products SET active = $1, updated_at = NOW(3) WHERE id = $2 AND tenant_id = $3 AND deleted_at IS NULL', [active, Number(req.params.id), T(req)]);

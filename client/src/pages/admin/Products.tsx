@@ -38,7 +38,7 @@ export default function Products() {
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar produto" className="h-11 w-64 rounded-xl border border-lenha-200 bg-white px-3" aria-label="Buscar produto" />
         <div className="ml-auto flex gap-2">
           <Button variant="outline" onClick={() => setCat({ name: '', sector: sectors[0], sort: data.categories.length, active: true })}>Nova categoria</Button>
-          <Button onClick={() => setEdit({ category_id: data.categories[0]?.id, name: '', description: '', active: true, online: true, featured: false, order_types: TYPES, sort: 0, variants: [{ name: 'Único', price: '' }], option_groups: [] })}>Novo produto</Button>
+          <Button onClick={() => setEdit({ category_id: data.categories[0]?.id, name: '', description: '', active: true, online: true, featured: false, order_types: TYPES, sort: 0, ncm: '', cfop: '', origem: '0', tax_class: 'normal', variants: [{ name: 'Único', price: '' }], option_groups: [] })}>Novo produto</Button>
         </div>
       </div>
       <p className="text-sm text-lenha-600">Preços e produtos valem na hora para o cardápio digital, PDV e garçons. Alterações de preço ficam registradas na auditoria; vendas antigas mantêm o preço da época.</p>
@@ -81,6 +81,7 @@ export default function Products() {
 const toForm = (p: any) => ({
   id: p.id, category_id: p.category_id, name: p.name, description: p.description, image_url: p.image_url, sector: p.sector || '', active: !!p.active, online: !!p.online, featured: !!p.featured,
   order_types: p.order_types, sort: p.sort,
+  ncm: p.ncm || '', cfop: p.cfop || '', origem: p.origem || '0', tax_class: p.tax_class || 'normal',
   variants: p.variants.filter((v: any) => v.active).map((v: any) => ({ id: v.id, name: v.name, price: centsToInput(v.price_cents), order_types: v.order_types })),
   option_groups: p.option_groups.map((g: any) => ({ id: g.id, name: g.name, min_select: g.min_select, max_select: g.max_select, options: g.options.filter((o: any) => o.active).map((o: any) => ({ id: o.id, name: o.name, price: centsToInput(o.price_cents) })) })),
 });
@@ -102,7 +103,7 @@ function ProductEditor({ initial, categories, sectors, onClose, onSaved }: { ini
     const groups = f.option_groups.map((g: any) => ({ id: g.id, name: g.name.trim(), min_select: Number(g.min_select) || 0, max_select: Math.max(1, Number(g.max_select) || 1),
       options: g.options.map((o: any) => ({ id: o.id, name: o.name.trim(), price_cents: parseMoney(o.price || '0'), active: true })) }));
     if (groups.some((g: any) => !g.name || !g.options.length || g.options.some((o: any) => !o.name || !Number.isFinite(o.price_cents)))) return setErr('Revise os grupos de opções: cada um precisa de nome e ao menos uma opção com preço (pode ser 0).');
-    const body = { category_id: Number(f.category_id), name: f.name, description: f.description || '', image_url: f.image_url || null, sector: f.sector || null, active: f.active, online: f.online, featured: f.featured, order_types: f.order_types, sort: Number(f.sort) || 0, variants, option_groups: groups };
+    const body = { category_id: Number(f.category_id), name: f.name, description: f.description || '', image_url: f.image_url || null, sector: f.sector || null, active: f.active, online: f.online, featured: f.featured, order_types: f.order_types, sort: Number(f.sort) || 0, ncm: f.ncm || null, cfop: f.cfop || null, origem: f.origem || '0', tax_class: f.tax_class || 'normal', variants, option_groups: groups };
     run('save', () => (f.id ? put(`/api/products/${f.id}`, body) : post('/api/products', body)).then(onSaved), 'Produto salvo.');
   };
   return (
@@ -114,6 +115,15 @@ function ProductEditor({ initial, categories, sectors, onClose, onSaved }: { ini
         <Field label="Descrição" className="sm:col-span-2"><Textarea value={f.description} onChange={(e) => set('description', e.target.value)} maxLength={400} /></Field>
         <Field label="Setor de preparo (cozinha)" hint="Vazio = usa o setor da categoria."><Select value={f.sector} onChange={(e) => set('sector', e.target.value)}><option value="">Da categoria</option>{sectors.map((s) => <option key={s} value={s}>{SECTOR_LABEL[s] || s}</option>)}</Select></Field>
         <Field label="Ordem de exibição"><Input inputMode="numeric" value={f.sort} onChange={(e) => set('sort', e.target.value.replace(/\D/g, ''))} /></Field>
+        <div className="sm:col-span-2 rounded-xl bg-lenha-50 p-3">
+          <p className="mb-2 text-sm font-semibold">Fiscal (nota) <span className="font-normal text-lenha-500">preencha só se a loja emite NFC-e</span></p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="NCM"><Input value={f.ncm || ''} onChange={(e) => set('ncm', e.target.value)} placeholder="21069090" /></Field>
+            <Field label="CFOP"><Input value={f.cfop || ''} onChange={(e) => set('cfop', e.target.value)} placeholder="5102" /></Field>
+            <Field label="Origem"><Select value={f.origem || '0'} onChange={(e) => set('origem', e.target.value)}><option value="0">0 - Nacional</option><option value="1">1 - Importado</option><option value="2">2 - Nacional, importação acima de 40%</option></Select></Field>
+            <Field label="Tributação (IBS/CBS)"><Select value={f.tax_class || 'normal'} onChange={(e) => set('tax_class', e.target.value)}><option value="normal">Tributação normal</option><option value="reduzido">Alíquota reduzida (alimentos)</option><option value="isento">Isento</option></Select></Field>
+          </div>
+        </div>
         <div className="sm:col-span-2">
           <span className="mb-1 block text-sm font-semibold text-lenha-700">Foto</span>
           <div className="flex items-center gap-3">

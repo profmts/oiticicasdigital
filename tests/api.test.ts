@@ -544,3 +544,37 @@ test('34 admin da empresa criado com CPF, telefone e e-mail; login em minúscula
   ok(await plat.post(`/api/platform/tenants/${tid}/admins`, { name: 'Segundo Dono', username: 'dono2', password: 'senhaForte2' }));
   assert.ok(ok(await plat.get(`/api/platform/tenants/${tid}/users`)).some((x: any) => x.username === 'dono2' && x.role === 'admin'));
 });
+
+test('35 R6: configuração fiscal (token mascarado) e campos fiscais do produto', async () => {
+  // Padrão: emissão desligada.
+  assert.equal(ok(await admin.get('/api/admin/settings/fiscal')).enabled, false);
+  // Salvar configuração fiscal com token secreto.
+  const saved = ok(await admin.put('/api/admin/settings/fiscal', { enabled: true, ambiente: 'homolog', cnpj: '12.345.678/0001-90', ie: '16123456', regime: 'simples', csc: 'CSC-SECRETO', csc_id: '000001', token: 'tok_secreto_123456' }));
+  assert.ok(saved.token.includes('•'), 'token volta mascarado');
+  assert.equal(saved.token_set, true);
+  const tid = (await db.get(`SELECT id FROM tenants WHERE slug = $1`, [SLUG])).id;
+  let stored = (await db.get("SELECT value FROM settings WHERE tenant_id = $1 AND `key` = 'fiscal'", [tid])).value;
+  assert.equal(stored.token, 'tok_secreto_123456', 'token salvo inteiro no banco');
+  assert.equal(stored.cnpj, '12345678000190', 'CNPJ só dígitos');
+  // Reenviar com o token mascarado mantém o token atual (não apaga o segredo).
+  ok(await admin.put('/api/admin/settings/fiscal', { enabled: true, ambiente: 'producao', cnpj: '12345678000190', ie: '16123456', regime: 'simples', csc: 'CSC-SECRETO', csc_id: '000001', token: saved.token }));
+  stored = (await db.get("SELECT value FROM settings WHERE tenant_id = $1 AND `key` = 'fiscal'", [tid])).value;
+  assert.equal(stored.token, 'tok_secreto_123456', 'token preservado ao salvar mascarado');
+  assert.equal(stored.ambiente, 'producao');
+  // /settings expõe só a flag, nunca o segredo.
+  const s = ok(await admin.get('/api/admin/settings'));
+  assert.equal(s.fiscal_enabled, true);
+  assert.equal(s.fiscal, undefined, 'o objeto fiscal (com token) não vai em /settings');
+  // Produto com campos fiscais.
+  const catId = ok(await admin.post('/api/categories', { name: 'Fiscal Cat', sector: 'cozinha' })).id;
+  const pid = ok(await admin.post('/api/products', { category_id: catId, name: 'Espeto Fiscal', order_types: ['balcao'], ncm: '1602.50.00', cfop: '5102', origem: '0', tax_class: 'normal', variants: [{ name: 'Único', price_cents: 800 }] })).id;
+  let prod = await db.get('SELECT ncm, cfop, origem, tax_class FROM products WHERE id = $1', [pid]);
+  assert.equal(prod.ncm, '16025000'); assert.equal(prod.cfop, '5102'); assert.equal(prod.tax_class, 'normal');
+  // Aplicar dados fiscais a toda a categoria.
+  const r = ok(await admin.post('/api/products/fiscal-category', { category_id: catId, ncm: '21069090', cfop: '5405', origem: '0', tax_class: 'reduzido' }));
+  assert.ok(r.updated >= 1);
+  prod = await db.get('SELECT ncm, cfop, tax_class FROM products WHERE id = $1', [pid]);
+  assert.equal(prod.ncm, '21069090'); assert.equal(prod.cfop, '5405'); assert.equal(prod.tax_class, 'reduzido');
+  // Desligar a emissão para não afetar outros testes.
+  ok(await admin.put('/api/admin/settings/fiscal', { enabled: false }));
+});
