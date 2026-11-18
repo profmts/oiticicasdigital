@@ -142,7 +142,7 @@ export default function Settings() {
         </div>
       </Section>
 
-      <FiscalSection />
+      {data.fiscal_in_plan && <FiscalSection />}
 
       <BackupSection />
 
@@ -180,13 +180,28 @@ function FiscalSection() {
   useEffect(() => { if (data) setF(data); }, [data]);
   if (!f) return null;
   const set = (k: string, v: any) => setF((x: any) => ({ ...x, [k]: v }));
+  const [test, setTest] = useState<any>(null);
   const save = () => run('fisc', () => put('/api/admin/settings/fiscal', {
     enabled: !!f.enabled, ambiente: f.ambiente || 'homolog', cnpj: f.cnpj || '', ie: f.ie || '', regime: f.regime || 'simples',
     csc: f.csc || '', csc_id: f.csc_id || '', token: f.token || '',
-  }).then(reload), 'Dados fiscais salvos.');
+  }).then((r: any) => { setF(r); setTest(null); }), 'Dados fiscais salvos.');
+  const testar = () => run('test', () => post('/api/admin/settings/fiscal/test', {}).then(setTest), undefined);
+  const chk = f.checklist;
   return (
     <Section title="Fiscal e impostos (NFC-e)" desc="Emissão de nota fiscal ao consumidor. Cada loja usa os próprios dados e certificado. A nota é emitida por uma API fiscal (Focus NFe), que já segue as regras novas de IBS e CBS.">
       <div className="space-y-3">
+        {chk && (
+          <div className="rounded-xl bg-lenha-50 p-3">
+            <p className="mb-2 text-sm font-semibold">{chk.pronto ? 'Tudo preenchido. Pode testar a conexão.' : 'O que falta para emitir:'}</p>
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {chk.items.map((i: any) => (
+                <li key={i.key} className={cx('flex items-center gap-2 text-sm', i.ok ? 'text-lenha-600' : 'text-alerta')}>
+                  <span>{i.ok ? '✓' : '○'}</span>{i.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Toggle checked={!!f.enabled} onChange={(v) => set('enabled', v)} label="Emitir nota fiscal (NFC-e) nesta loja" />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="CNPJ"><Input value={f.cnpj || ''} onChange={(e) => set('cnpj', e.target.value)} placeholder="00.000.000/0000-00" /></Field>
@@ -198,7 +213,11 @@ function FiscalSection() {
           <Field label="Token da API fiscal"><Input value={f.token || ''} onChange={(e) => set('token', e.target.value)} placeholder="cole o token da Focus NFe" /></Field>
         </div>
         <p className="rounded-lg bg-lenha-50 px-3 py-2 text-sm text-lenha-600">O certificado digital A1 da loja é enviado na própria API fiscal. Comece no ambiente de Teste e mude para Produção quando estiver tudo certo. O cálculo do imposto é feito pela API, nunca fixo no sistema.</p>
-        <Button busy={busy === 'fisc'} onClick={save}>Salvar dados fiscais</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button busy={busy === 'fisc'} onClick={save}>Salvar dados fiscais</Button>
+          <Button variant="outline" busy={busy === 'test'} onClick={testar}>Testar conexão</Button>
+        </div>
+        {test && <p className={cx('rounded-lg px-3 py-2 text-sm', test.ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')}>{test.message}</p>}
       </div>
     </Section>
   );

@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, audit, broadcast, getSettings, setSetting, hashPassword, digits, confirmPassword, HttpError } from '../core.js';
+import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, audit, broadcast, getSettings, setSetting, hashPassword, digits, confirmPassword, HttpError, planFiscal } from '../core.js';
 import { ROLES, ROLE_LABELS, PERMISSIONS, ROLE_DEFAULTS, effectivePermissions } from '../permissions.js';
 import * as C from '../services/cash.js';
 import { dashboard, REPORTS, runReport, toCsv } from '../services/reports.js';
@@ -218,10 +218,12 @@ const settingsSchema = z.object({
   hide_table_13: z.boolean(), team_pin: z.string().max(20).regex(/^\d*$/, 'O PIN deve conter apenas números.'),
   brand_color: hex, brand_dark: hex, menu_font: z.enum(['modern', 'slab']),
 }).partial();
-const SAFE_KEYS = ['store_name', 'whatsapp', 'whatsapp_display', 'address', 'city', 'prep_alert_minutes', 'payment_methods', 'kitchen_sectors', 'is_open', 'pix_key', 'brand_color', 'brand_dark', 'timezone', 'self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled', 'fiscal_enabled'];
+const SAFE_KEYS = ['store_name', 'whatsapp', 'whatsapp_display', 'address', 'city', 'prep_alert_minutes', 'payment_methods', 'kitchen_sectors', 'is_open', 'pix_key', 'brand_color', 'brand_dark', 'timezone', 'self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled', 'fiscal_enabled', 'fiscal_in_plan'];
 adminRouter.get('/settings', requirePerm('settings.manage', 'orders.view', 'pdv.use', 'kitchen.use', 'tables.use', 'delivery.courier'), h(async (req) => {
   const s = await getSettings(req.db, T(req));
-  s.fiscal_enabled = !!(s.fiscal && s.fiscal.enabled); // flag simples para a equipe
+  const fiscalInPlan = planFiscal(req.tenant); // nota fiscal é recurso do plano (só no Máximo)
+  s.fiscal_in_plan = fiscalInPlan;
+  s.fiscal_enabled = fiscalInPlan && !!(s.fiscal && s.fiscal.enabled); // flag simples para a equipe
   delete s.fiscal; // o segredo (token) fica só no endpoint próprio, mascarado
   if (!can(req.user, 'settings.manage')) return Object.fromEntries(SAFE_KEYS.map((k) => [k, s[k]]));
   return s;
@@ -258,15 +260,25 @@ const fiscalSchema = z.object({
   cnpj: z.string().max(18), ie: z.string().max(20), regime: z.enum(['simples', 'mei', 'normal']),
   csc: z.string().max(120), csc_id: z.string().max(10), token: z.string().max(120), auto_emit: z.boolean(),
 }).partial();
-adminRouter.get('/settings/fiscal', requirePerm('settings.manage'), h(async (req) => F.maskFiscal(await F.readFiscal(req.db, T(req)))));
+const requireFiscalPlan = (req: any) => { if (!planFiscal(req.tenant)) throw conflict('A nota fiscal faz parte do plano Máximo. Troque o plano desta loja para liberar a emissão.'); };
+adminRouter.get('/settings/fiscal', requirePerm('settings.manage'), h(async (req) => {
+  requireFiscalPlan(req);
+  return { ...F.maskFiscal(await F.readFiscal(req.db, T(req))), checklist: await F.fiscalChecklist(req.db, T(req)) };
+}));
 adminRouter.put('/settings/fiscal', requirePerm('settings.manage'), h(async (req) => {
+  requireFiscalPlan(req);
   const body = fiscalSchema.parse(req.body);
   // Token mascarado (contém ••) significa "manter o atual": não sobrescreve o segredo.
   if (body.token && body.token.includes('•')) delete body.token;
   const saved = await req.db.tx((q) => F.saveFiscal(q, T(req), body));
   await audit(req.db, { tenantId: T(req), userId: req.user!.id, action: 'settings.fiscal', data: { enabled: saved.enabled, ambiente: saved.ambiente, regime: saved.regime }, ip: req.ip });
   broadcast(T(req), 'settings');
-  return F.maskFiscal(saved);
+  return { ...F.maskFiscal(saved), checklist: await F.fiscalChecklist(req.db, T(req)) };
+}));
+// Testar conexão: loga na API fiscal e confirma que o token/empresa estão prontos para emitir.
+adminRouter.post('/settings/fiscal/test', requirePerm('settings.manage'), h(async (req) => {
+  requireFiscalPlan(req);
+  return F.testFiscalConnection(req.db, T(req));
 }));
 adminRouter.post('/logo', requirePerm('settings.manage'), h(async (req) => {
   const { file_id } = z.object({ file_id: z.number().int().nullable() }).parse(req.body);

@@ -46,6 +46,8 @@ export async function tenantBySlug(q: Q, slug: string) {
 }
 export const tenantActive = (t: TenantCtx) => t.status === 'ativo' || (t.status === 'teste' && (!t.trial_ends_at || t.trial_ends_at > new Date().toISOString()));
 export const feature = (t: TenantCtx | undefined, f: string) => !t?.plan?.features || t.plan.features[f] !== false;
+// Recurso opt-in (precisa estar explicitamente ligado no plano): usado pela nota fiscal.
+export const planFiscal = (t: TenantCtx | undefined) => !!t?.plan?.features?.nota_fiscal;
 
 export async function loadUser(q: Q, id: number): Promise<SessionUser | undefined> {
   const u = await q.get('SELECT id, tenant_id, name, username, role, permissions, active, available FROM users WHERE id = $1 AND deleted_at IS NULL', [id]);

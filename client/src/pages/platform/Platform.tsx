@@ -273,6 +273,7 @@ function TenantEditor({ tenant, plans, onClose, onDone }: { tenant: any; plans: 
 }
 
 const ROLE_PT: Record<string, string> = { admin: 'Administrador', gerente: 'Gerente', caixa: 'Caixa', garcom: 'Garçom', cozinha: 'Cozinha', motoboy: 'Motoboy' };
+const SUPORTE_PT: Record<string, string> = { sem: 'sem suporte', agendado: 'agendado', prioritario: 'prioritário' };
 
 /** Aba Acessos: lista de usuários com redefinir senha por linha + adicionar administrador. */
 function AcessosTab({ tenantId, users, reload }: { tenantId: number; users: any[]; reload: () => void }) {
@@ -343,7 +344,7 @@ export function PlatformPlans() {
   return (
     <div>
       <div className="mb-4 flex items-center"><h1 className="font-slab text-2xl font-bold">Planos</h1>
-        <Button className="ml-auto" onClick={() => setEdit({ name: '', description: '', price: '', max_users: '', max_tables: '', max_products: '', features: { delivery: true, self_order: true, kds: true, reports: true }, active: true })}>Novo plano</Button></div>
+        <Button className="ml-auto" onClick={() => setEdit({ name: '', description: '', price: '', max_users: '', max_tables: '', max_products: '', features: { delivery: true, self_order: true, kds: true, reports: true, tables: true, nota_fiscal: false }, support: 'sem', active: true })}>Novo plano</Button></div>
       <p className="mb-4 text-sm text-lenha-600">Limites vazios = ilimitado. O preço é informativo até a cobrança automática ser integrada (ver documentação).</p>
       <div className="grid gap-3 md:grid-cols-3">
         {list.map((p) => (
@@ -354,9 +355,10 @@ export function PlatformPlans() {
             <ul className="mt-3 space-y-1 text-sm">
               <li>Usuários: {p.max_users ?? 'ilimitado'}</li><li>Mesas: {p.max_tables ?? 'ilimitado'}</li><li>Produtos: {p.max_products ?? 'ilimitado'}</li>
               <li>Delivery: {p.features.delivery ? 'sim' : 'não'} · QR na mesa: {p.features.self_order ? 'sim' : 'não'} · Relatórios: {p.features.reports ? 'sim' : 'não'}</li>
+              <li>Nota fiscal: {p.features.nota_fiscal ? 'sim' : 'não'} · Suporte: {SUPORTE_PT[p.support] || 'sem suporte'}</li>
             </ul>
             <p className="mt-2 text-xs text-lenha-500">{p.tenants} empresa(s)</p>
-            <Button size="sm" variant="outline" className="mt-3" onClick={() => setEdit({ ...p, price: p.price_cents == null ? '' : centsToInput(p.price_cents), max_users: p.max_users ?? '', max_tables: p.max_tables ?? '', max_products: p.max_products ?? '' })}>Editar</Button>
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => setEdit({ ...p, features: { tables: true, nota_fiscal: false, ...p.features }, support: p.support || 'sem', price: p.price_cents == null ? '' : centsToInput(p.price_cents), max_users: p.max_users ?? '', max_tables: p.max_tables ?? '', max_products: p.max_products ?? '' })}>Editar</Button>
           </article>
         ))}
       </div>
@@ -369,7 +371,7 @@ function PlanEditor({ initial, onClose, onDone }: { initial: any; onClose: () =>
   const [f, setF] = useState(initial);
   const { run, busy } = useAction();
   const n = (v: any) => (v === '' || v == null ? null : Number(String(v).replace(/\D/g, '')) || null);
-  const body = { name: f.name, description: f.description, price_cents: f.price === '' ? null : parseMoney(f.price), max_users: n(f.max_users), max_tables: n(f.max_tables), max_products: n(f.max_products), features: f.features, active: f.active };
+  const body = { name: f.name, description: f.description, price_cents: f.price === '' ? null : parseMoney(f.price), max_users: n(f.max_users), max_tables: n(f.max_tables), max_products: n(f.max_products), features: f.features, support: f.support || 'sem', active: f.active };
   return (
     <Modal open onClose={onClose} title={f.id ? 'Editar plano' : 'Novo plano'}
       footer={<Button className="w-full" busy={!!busy} disabled={f.name.length < 2} onClick={() => run('s', () => (f.id ? put(`/api/platform/plans/${f.id}`, body) : post('/api/platform/plans', body)).then(onDone), 'Plano salvo.')}>Salvar</Button>}>
@@ -382,9 +384,10 @@ function PlanEditor({ initial, onClose, onDone }: { initial: any; onClose: () =>
         <Field label="Máx. produtos"><Input inputMode="numeric" value={f.max_products} onChange={(e) => setF({ ...f, max_products: e.target.value })} placeholder="ilimitado" /></Field>
       </div>
       <div className="mt-4 space-y-3">
-        {([['delivery', 'Delivery e retirada pelo cardápio'], ['self_order', 'Pedido pelo QR Code (mesa e balcão)'], ['kds', 'Tela da cozinha'], ['reports', 'Relatórios e exportação']] as const).map(([k, l]) => (
-          <Toggle key={k} checked={f.features[k]} onChange={(v) => setF({ ...f, features: { ...f.features, [k]: v } })} label={l} />
+        {([['tables', 'Mesas (atendidas pelo garçom)'], ['kds', 'Tela da cozinha'], ['reports', 'Relatórios e exportação'], ['self_order', 'Cliente pede pelo cardápio (QR na mesa e balcão)'], ['delivery', 'Delivery e retirada pelo cardápio'], ['nota_fiscal', 'Nota fiscal (NFC-e)']] as const).map(([k, l]) => (
+          <Toggle key={k} checked={!!f.features[k]} onChange={(v) => setF({ ...f, features: { ...f.features, [k]: v } })} label={l} />
         ))}
+        <Field label="Suporte"><Select value={f.support || 'sem'} onChange={(e) => setF({ ...f, support: e.target.value })}><option value="sem">Sem suporte</option><option value="agendado">Suporte agendado</option><option value="prioritario">Suporte prioritário</option></Select></Field>
         <Toggle checked={f.active} onChange={(v) => setF({ ...f, active: v })} label="Disponível para novas empresas" />
       </div>
     </Modal>
