@@ -17,7 +17,7 @@ export interface SessionUser {
   id: number; tenantId: number; name: string; username: string; role: Role; permissions: Permission[]; available: boolean; impersonatedBy?: number | null;
 }
 export interface PlatformUser { id: number; name: string; username: string }
-export interface TenantCtx { id: number; slug: string; name: string; status: string; plan: any | null; logo_file_id: number | null; cover_file_id: number | null; trial_ends_at: string | null }
+export interface TenantCtx { id: number; slug: string; name: string; status: string; archived_at: string | null; plan: any | null; logo_file_id: number | null; cover_file_id: number | null; trial_ends_at: string | null }
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -33,18 +33,18 @@ export const hashPassword = (pw: string) => bcrypt.hash(pw, 12);
 export const checkPassword = (pw: string, hash: string) => bcrypt.compare(pw, hash);
 
 export async function loadTenant(q: Q, id: number): Promise<TenantCtx | undefined> {
-  const t = await q.get(`SELECT t.id, t.slug, t.name, t.status, t.logo_file_id, t.cover_file_id, t.trial_ends_at,
+  const t = await q.get(`SELECT t.id, t.slug, t.name, t.status, t.archived_at, t.logo_file_id, t.cover_file_id, t.trial_ends_at,
       p.id plan_id, p.name plan_name, p.max_users, p.max_tables, p.max_products, p.features
     FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id WHERE t.id = $1`, [id]);
   if (!t) return undefined;
   const plan = t.plan_id ? { id: t.plan_id, name: t.plan_name, max_users: t.max_users, max_tables: t.max_tables, max_products: t.max_products, features: t.features } : null;
-  return { id: t.id, slug: t.slug, name: t.name, status: t.status, logo_file_id: t.logo_file_id, cover_file_id: t.cover_file_id, trial_ends_at: t.trial_ends_at, plan };
+  return { id: t.id, slug: t.slug, name: t.name, status: t.status, archived_at: t.archived_at, logo_file_id: t.logo_file_id, cover_file_id: t.cover_file_id, trial_ends_at: t.trial_ends_at, plan };
 }
 export async function tenantBySlug(q: Q, slug: string) {
   const r = await q.get('SELECT id FROM tenants WHERE slug = $1', [String(slug).toLowerCase()]);
   return r ? loadTenant(q, r.id) : undefined;
 }
-export const tenantActive = (t: TenantCtx) => t.status === 'ativo' || (t.status === 'teste' && (!t.trial_ends_at || t.trial_ends_at > new Date().toISOString()));
+export const tenantActive = (t: TenantCtx) => !t.archived_at && (t.status === 'ativo' || (t.status === 'teste' && (!t.trial_ends_at || t.trial_ends_at > new Date().toISOString())));
 export const feature = (t: TenantCtx | undefined, f: string) => !t?.plan?.features || t.plan.features[f] !== false;
 // Recurso opt-in (precisa estar explicitamente ligado no plano): usado pela nota fiscal.
 export const planFiscal = (t: TenantCtx | undefined) => !!t?.plan?.features?.nota_fiscal;
