@@ -191,3 +191,34 @@ export async function cancelNfce(db: DB, t: number, orderId: number, justificati
   const r = await focus(cfg, 'DELETE', `/v2/nfce/${encodeURIComponent(row.ref)}`, { justificativa: justificativa.trim() });
   return applyResult(db, t, row.ref, r);
 }
+
+// Checklist do que falta preencher para a loja emitir nota. Mostra na aba Fiscal.
+export async function fiscalChecklist(q: Q, t: number) {
+  const c = await readFiscal(q, t);
+  const items = [
+    { key: 'cnpj', label: 'CNPJ', ok: c.cnpj.length === 14 },
+    { key: 'ie', label: 'Inscrição Estadual', ok: !!c.ie.trim() },
+    { key: 'regime', label: 'Regime tributário', ok: !!c.regime },
+    { key: 'csc', label: 'CSC (código de segurança)', ok: !!c.csc.trim() },
+    { key: 'csc_id', label: 'ID do CSC', ok: !!c.csc_id.trim() },
+    { key: 'token', label: 'Token da API fiscal', ok: !!c.token.trim() },
+  ];
+  return { items, pronto: items.every((i) => i.ok), ambiente: c.ambiente, enabled: c.enabled };
+}
+
+// Loga na API fiscal e confirma que o token/empresa estão prontos para emitir.
+export async function testFiscalConnection(db: DB, t: number): Promise<{ ok: boolean; message: string }> {
+  const cfg = await readFiscal(db, t);
+  if (!cfg.token) return { ok: false, message: 'Falta o token da API fiscal. Preencha e salve antes de testar.' };
+  if (cfg.cnpj.length !== 14) return { ok: false, message: 'Preencha um CNPJ válido antes de testar.' };
+  try {
+    const r = await focus(cfg, 'GET', '/v2/empresas');
+    const amb = cfg.ambiente === 'producao' ? 'produção' : 'teste';
+    if (r.httpStatus >= 200 && r.httpStatus < 300) return { ok: true, message: `Conexão com a API fiscal funcionando, no ambiente de ${amb}. Pronto para emitir.` };
+    if (r.httpStatus === 401 || r.httpStatus === 403) return { ok: false, message: 'O token foi recusado pela API fiscal. Confira se copiou o token certo da loja.' };
+    if (r.httpStatus === 404) return { ok: false, message: 'Token aceito, mas a empresa ainda não está cadastrada na API fiscal. Envie o certificado digital lá primeiro.' };
+    return { ok: false, message: `A API fiscal respondeu com status ${r.httpStatus}. Tente de novo em instantes.` };
+  } catch {
+    return { ok: false, message: 'Não consegui falar com a API fiscal agora. Verifique a internet do servidor e tente de novo.' };
+  }
+}

@@ -5,17 +5,17 @@ import { post } from '../../lib/api';
 import { useToast, useAction, cx } from '../../components/ui';
 import { PlatformWordmark, TenantLogo } from '../../components/brand';
 
-const NAV: { to: string; label: string; perm: string; group: string; icon: string }[] = [
+const NAV: { to: string; label: string; perm: string; group: string; icon: string; feat?: string }[] = [
   { to: '/admin', label: 'Painel', perm: 'dashboard.view', group: 'Operação', icon: 'M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z' },
   { to: '/admin/pedidos', label: 'Pedidos', perm: 'orders.view', group: 'Operação', icon: 'M4 4h4v16H4zm6 0h4v10h-4zm6 0h4v13h-4z' },
   { to: '/admin/pdv', label: 'PDV', perm: 'pdv.use', group: 'Operação', icon: 'M4 5h16v10H4zm-1 12h18v2H3zm5-9h2v4H8zm4 0h4v2h-4z' },
-  { to: '/admin/mesas', label: 'Mesas', perm: 'tables.use', group: 'Operação', icon: 'M3 8h18v3h-2v8h-2v-8H7v8H5v-8H3z' },
-  { to: '/admin/entregas', label: 'Entregas', perm: 'delivery.manage', group: 'Operação', icon: 'M5 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0M3 6h11v9H3zm11 3h4l3 4v2h-7z' },
+  { to: '/admin/mesas', label: 'Mesas', perm: 'tables.use', group: 'Operação', feat: 'tables', icon: 'M3 8h18v3h-2v8h-2v-8H7v8H5v-8H3z' },
+  { to: '/admin/entregas', label: 'Entregas', perm: 'delivery.manage', group: 'Operação', feat: 'delivery', icon: 'M5 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0M3 6h11v9H3zm11 3h4l3 4v2h-7z' },
   { to: '/admin/caixa', label: 'Caixa', perm: 'cash.operate', group: 'Operação', icon: 'M3 7h18v12H3zm2-3h14v2H5zm7 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6' },
   { to: '/admin/produtos', label: 'Cardápio', perm: 'products.manage', group: 'Gestão', icon: 'M5 3h14v18H5zm3 4h8v2H8zm0 4h8v2H8zm0 4h5v2H8z' },
   { to: '/admin/clientes', label: 'Clientes', perm: 'customers.view', group: 'Gestão', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8m-8 8c0-4 4-6 8-6s8 2 8 6z' },
   { to: '/admin/financeiro', label: 'Financeiro', perm: 'finance.view', group: 'Gestão', icon: 'M4 19h16v2H4zM6 10h3v7H6zm5-4h3v11h-3zm5 6h3v5h-3z' },
-  { to: '/admin/relatorios', label: 'Relatórios', perm: 'reports.view', group: 'Gestão', icon: 'M6 2h9l5 5v15H6zm8 1v5h5M9 13h8v2H9zm0 4h8v2H9z' },
+  { to: '/admin/relatorios', label: 'Relatórios', perm: 'reports.view', group: 'Gestão', feat: 'reports', icon: 'M6 2h9l5 5v15H6zm8 1v5h5M9 13h8v2H9zm0 4h8v2H9z' },
   { to: '/admin/usuarios', label: 'Equipe e acessos', perm: 'users.manage', group: 'Sistema', icon: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m8 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6M1 21c0-4 4-6 8-6s8 2 8 6zm16-5c3 0 6 1.5 6 5h-4' },
   { to: '/admin/qrcodes', label: 'QR Codes', perm: 'tables.manage', group: 'Sistema', icon: 'M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm8-2h3v3h-3zm3 3h2v2h-2zm2-3h3v3h-3zm-5 5h3v3h-3zm5 0h3v3h-3z' },
   { to: '/admin/configuracoes', label: 'Configurações', perm: 'settings.manage', group: 'Sistema', icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8m9 4-2-1 .5-2.3-2-2-2.2.6L14 3h-4l-1.2 2.3-2.3-.6-2 2L5 9 3 10v4l2 1-.5 2.3 2 2 2.3-.6L10 21h4l1.2-2.3 2.3.6 2-2L19 15l2-1z' },
@@ -49,7 +49,8 @@ export default function AdminLayout() {
       toast('A cozinha enviou uma dúvida sobre um pedido. Veja o histórico do pedido.', 'info');
     }
   });
-  const items = NAV.filter((n) => can(n.perm) || (n.to === '/admin/qrcodes' && can('settings.manage')));
+  const feat = (k?: string) => !k || tenant?.plan?.features?.[k] !== false; // opt-out: plano sem a chave mantém o recurso
+  const items = NAV.filter((n) => (can(n.perm) || (n.to === '/admin/qrcodes' && can('settings.manage'))) && feat(n.feat));
   const groups = [...new Set(items.map((i) => i.group))];
   const isOpen = settings.data?.is_open;
 
@@ -74,9 +75,9 @@ export default function AdminLayout() {
       ))}
       <div>
         <p className="mb-1 px-3 text-xs font-semibold text-white/40">Telas da equipe</p>
-        {can('kitchen.use') && <a href="/cozinha" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">Tela da cozinha</a>}
-        {can('tables.use') && <a href="/garcom" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">App do garçom</a>}
-        {can('delivery.courier') && <a href="/motoboy" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">App do motoboy</a>}
+        {can('kitchen.use') && feat('kds') && <a href="/cozinha" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">Tela da cozinha</a>}
+        {can('tables.use') && feat('tables') && <a href="/garcom" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">App do garçom</a>}
+        {can('delivery.courier') && feat('delivery') && <a href="/motoboy" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">App do motoboy</a>}
         {tenant && <a href={`/${tenant.slug}`} target="_blank" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">Cardápio digital</a>}
       </div>
     </nav>

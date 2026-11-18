@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, authorize, audit, broadcast, sseSubscribe, getSetting, type SessionUser } from '../core.js';
+import { h, bad, forbidden, notFound, conflict, requireAuth, requirePerm, can, authorize, audit, broadcast, sseSubscribe, getSetting, planFiscal, type SessionUser } from '../core.js';
 import * as O from '../services/orders.js';
 import * as C from '../services/cash.js';
 import * as F from '../services/fiscal.js';
@@ -220,6 +220,7 @@ async function fiscalItems(req: Request, orderId: number) {
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id WHERE i.order_id = $1 AND i.status <> 'cancelado' ORDER BY i.id`, [orderId]);
 }
 opsRouter.post('/orders/:id/nfce', requirePerm('payments.receive', 'orders.manage'), h(async (req) => {
+  if (!planFiscal(req.tenant)) throw conflict('A nota fiscal faz parte do plano Máximo.');
   const { cpf } = z.object({ cpf: z.string().max(14).nullable().optional() }).parse(req.body || {});
   const o = await loadForUser(req, id(req));
   const items = await fiscalItems(req, o.id);

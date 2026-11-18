@@ -200,20 +200,21 @@ platformRouter.post('/tenants/:id/impersonate', h(async (req, res) => {
 const planSchema = z.object({
   name: z.string().min(2).max(60), description: z.string().max(400).default(''), price_cents: z.number().int().min(0).nullable(),
   max_users: z.number().int().min(1).nullable(), max_tables: z.number().int().min(0).nullable(), max_products: z.number().int().min(1).nullable(),
-  features: z.object({ delivery: z.boolean(), self_order: z.boolean(), kds: z.boolean(), reports: z.boolean() }), active: z.boolean().default(true),
+  features: z.object({ delivery: z.boolean(), self_order: z.boolean(), kds: z.boolean(), reports: z.boolean(), tables: z.boolean().default(true), nota_fiscal: z.boolean().default(false) }),
+  support: z.enum(['sem', 'agendado', 'prioritario']).default('sem'), active: z.boolean().default(true),
 });
 platformRouter.get('/plans', h((req) => req.db.all('SELECT p.*, (SELECT COUNT(*) FROM tenants t WHERE t.plan_id = p.id) tenants FROM plans p ORDER BY p.id')));
 platformRouter.post('/plans', h(async (req) => {
   const p = planSchema.parse(req.body);
-  const r = await req.db.get('INSERT INTO plans (name, description, price_cents, max_users, max_tables, max_products, features, active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-    [p.name, p.description, p.price_cents, p.max_users, p.max_tables, p.max_products, JSON.stringify(p.features), p.active]);
+  const r = await req.db.get('INSERT INTO plans (name, description, price_cents, max_users, max_tables, max_products, features, support, active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+    [p.name, p.description, p.price_cents, p.max_users, p.max_tables, p.max_products, JSON.stringify(p.features), p.support, p.active]);
   await audit(req.db, { platformUserId: P(req), action: 'platform.plan_create', entity: 'plan', entityId: r.id, data: p, ip: req.ip });
   return { id: r.id };
 }));
 platformRouter.put('/plans/:id', h(async (req) => {
   const p = planSchema.parse(req.body);
-  const r = await req.db.run('UPDATE plans SET name=$1, description=$2, price_cents=$3, max_users=$4, max_tables=$5, max_products=$6, features=$7, active=$8 WHERE id=$9',
-    [p.name, p.description, p.price_cents, p.max_users, p.max_tables, p.max_products, JSON.stringify(p.features), p.active, Number(req.params.id)]);
+  const r = await req.db.run('UPDATE plans SET name=$1, description=$2, price_cents=$3, max_users=$4, max_tables=$5, max_products=$6, features=$7, support=$8, active=$9 WHERE id=$10',
+    [p.name, p.description, p.price_cents, p.max_users, p.max_tables, p.max_products, JSON.stringify(p.features), p.support, p.active, Number(req.params.id)]);
   if (!r.rowCount) throw notFound();
   await audit(req.db, { platformUserId: P(req), action: 'platform.plan_update', entity: 'plan', entityId: Number(req.params.id), data: p, ip: req.ip });
   return { ok: true };

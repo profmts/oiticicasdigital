@@ -546,6 +546,9 @@ test('34 admin da empresa criado com CPF, telefone e e-mail; login em minúscula
 });
 
 test('35 R6: configuração fiscal (token mascarado) e campos fiscais do produto', async () => {
+  // A nota fiscal é recurso de plano: coloca a loja demo num plano com nota fiscal.
+  const fplan = ok(await plat.post('/api/platform/plans', { name: 'Fiscal Teste', description: '', price_cents: null, max_users: null, max_tables: null, max_products: null, features: { delivery: true, self_order: true, kds: true, reports: true, tables: true, nota_fiscal: true }, support: 'prioritario' }));
+  await db.run('UPDATE tenants SET plan_id = $1 WHERE slug = $2', [fplan.id, SLUG]);
   // Padrão: emissão desligada.
   assert.equal(ok(await admin.get('/api/admin/settings/fiscal')).enabled, false);
   // Salvar configuração fiscal com token secreto.
@@ -577,4 +580,24 @@ test('35 R6: configuração fiscal (token mascarado) e campos fiscais do produto
   assert.equal(prod.ncm, '21069090'); assert.equal(prod.cfop, '5405'); assert.equal(prod.tax_class, 'reduzido');
   // Desligar a emissão para não afetar outros testes.
   ok(await admin.put('/api/admin/settings/fiscal', { enabled: false }));
+});
+
+test('36 R7: planos (3 criados), suporte e nota fiscal só com recurso no plano', async () => {
+  // Os três planos de venda foram semeados pela migração.
+  const plans = ok(await plat.get('/api/platform/plans'));
+  const comeco = plans.find((p: any) => p.name === 'Começo');
+  const maximo = plans.find((p: any) => p.name === 'Máximo');
+  assert.ok(comeco && maximo, 'planos Começo e Máximo existem');
+  assert.equal(comeco.support, 'sem'); assert.equal(comeco.features.nota_fiscal, false);
+  assert.equal(maximo.support, 'prioritario'); assert.equal(maximo.features.nota_fiscal, true);
+  assert.equal(maximo.features.delivery, true); assert.equal(comeco.features.delivery, false);
+  // Sem o recurso no plano, os endpoints fiscais são bloqueados.
+  await db.run('UPDATE tenants SET plan_id = $1 WHERE slug = $2', [comeco.id, SLUG]);
+  assert.equal((await admin.get('/api/admin/settings/fiscal')).status, 409, 'plano sem nota fiscal bloqueia');
+  assert.equal((await admin.put('/api/admin/settings/fiscal', { enabled: true })).status, 409);
+  // Com o plano Máximo, libera de novo.
+  await db.run('UPDATE tenants SET plan_id = $1 WHERE slug = $2', [maximo.id, SLUG]);
+  assert.equal((await admin.get('/api/admin/settings/fiscal')).status, 200, 'plano Máximo libera');
+  // A flag fiscal_in_plan acompanha o plano.
+  assert.equal(ok(await admin.get('/api/admin/settings')).fiscal_in_plan, true);
 });

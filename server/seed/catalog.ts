@@ -127,14 +127,36 @@ export async function createTenant(q: Q, t: { slug: string; name: string; plan_i
 
 export const newTableToken = () => randomToken(12);
 
+/** Os três planos de venda (Começo, Pro, Máximo). A nota fiscal é opt-in (só no Máximo). */
+const SALES_PLANS = [
+  { name: 'Começo', description: 'Para quem está começando, sozinho e no balcão.', price_cents: 1990, max_users: 1,
+    features: { delivery: false, self_order: false, kds: false, reports: false, tables: false, nota_fiscal: false }, support: 'sem' },
+  { name: 'Pro', description: 'Equipe e salão: funções separadas, cozinha, mesas e relatórios.', price_cents: 3990, max_users: 5,
+    features: { delivery: false, self_order: false, kds: true, reports: true, tables: true, nota_fiscal: false }, support: 'agendado' },
+  { name: 'Máximo', description: 'Tudo liberado: autoatendimento, delivery, motoboy e nota fiscal.', price_cents: 5990, max_users: null,
+    features: { delivery: true, self_order: true, kds: true, reports: true, tables: true, nota_fiscal: true }, support: 'prioritario' },
+];
+
 /** Primeira execução: plano inicial e a empresa Espetinho do Sergio com o cardápio e as configurações atuais. */
 export async function seedPlatform(db: DB) {
   await db.tx(async (q) => {
-    if (!(await q.get('SELECT 1 FROM plans LIMIT 1'))) {
-      await q.run(`INSERT INTO plans (name, description, price_cents) VALUES ('Plano inicial', 'Todos os recursos, sem limites. Defina preços e limites quando lançar os planos.', NULL)`);
+    // Plano inicial = todos os recursos, inclusive nota fiscal (usado pela loja demo).
+    const fullFeatures = JSON.stringify({ delivery: true, self_order: true, kds: true, reports: true, tables: true, nota_fiscal: true });
+    const pi = await q.get("SELECT id, features FROM plans WHERE name = 'Plano inicial'");
+    if (!pi) {
+      await q.run(`INSERT INTO plans (name, description, price_cents, features) VALUES ('Plano inicial', 'Todos os recursos, sem limites. Defina preços e limites quando lançar os planos.', NULL, $1)`, [fullFeatures]);
+    } else if (!pi.features?.nota_fiscal) {
+      await q.run('UPDATE plans SET features = $1 WHERE id = $2', [fullFeatures, pi.id]); // libera nota fiscal em instalações antigas
+    }
+    // Três planos de venda (idempotente por nome): cada um com recursos, limites, suporte e preço.
+    for (const p of SALES_PLANS) {
+      if (!(await q.get('SELECT 1 FROM plans WHERE name = $1', [p.name]))) {
+        await q.run('INSERT INTO plans (name, description, price_cents, max_users, max_tables, max_products, features, support, active) VALUES ($1,$2,$3,$4,NULL,NULL,$5,$6,1)',
+          [p.name, p.description, p.price_cents, p.max_users, JSON.stringify(p.features), p.support]);
+      }
     }
     if (config.seedEspetinho && !(await q.get("SELECT 1 FROM tenants WHERE slug = 'espetinho-do-sergio'"))) {
-      const plan = await q.get('SELECT id FROM plans ORDER BY id LIMIT 1');
+      const plan = await q.get("SELECT id FROM plans WHERE name = 'Plano inicial'");
       const id = await createTenant(q, { slug: 'espetinho-do-sergio', name: 'Espetinho do Sergio', plan_id: plan.id, contact_phone: '83998361492' });
       await applySettings(q, id, ESPETINHO_SETTINGS);
       await seedCatalog(q, id, ESPETINHO_CATALOG);
