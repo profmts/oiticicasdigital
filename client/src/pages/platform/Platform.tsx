@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { get, post, put } from '../../lib/api';
+import { get, post, put, del } from '../../lib/api';
 import { money, parseMoney, centsToInput, dateTime, date, normUser, phoneFmt, genPassword } from '../../lib/format';
 
 /** Sugere um login a partir do nome (primeiro nome) ou um padrão. */
@@ -103,8 +103,9 @@ export function PlatformTenants() {
   const [edit, setEdit] = useState<any>(null);
   const [creating, setCreating] = useState(false);
   const [q, setQ] = useState('');
-  const load = () => { get('/api/platform/tenants').then(setList); get('/api/platform/plans').then(setPlans); };
-  useEffect(load, []);
+  const [showArchived, setShowArchived] = useState(false);
+  const load = () => { get('/api/platform/tenants' + (showArchived ? '?archived=1' : '')).then(setList); get('/api/platform/plans').then(setPlans); };
+  useEffect(() => { load(); }, [showArchived]); // eslint-disable-line
   if (!list) return <Spinner />;
   const shown = list.filter((t) => !q || (t.name + t.slug).toLowerCase().includes(q.toLowerCase()));
   return (
@@ -112,8 +113,10 @@ export function PlatformTenants() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h1 className="font-slab text-2xl font-bold">Empresas</h1>
         <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar" className="ml-auto sm:w-56" aria-label="Buscar empresa" />
+        <Button variant="outline" onClick={() => setShowArchived((v) => !v)}>{showArchived ? 'Ver ativas' : 'Ver arquivadas'}</Button>
         <Button onClick={() => setCreating(true)}>Nova empresa</Button>
       </div>
+      {showArchived && <p className="mb-3 rounded-lg bg-lenha-100 px-3 py-2 text-sm text-lenha-600">Mostrando empresas arquivadas. Abra em Gerenciar para restaurar ou excluir de vez.</p>}
       <div className="grid gap-3 md:grid-cols-2">
         {shown.map((t) => (
           <article key={t.id} className="rounded-2xl bg-white p-4 ring-1 ring-lenha-100">
@@ -122,7 +125,7 @@ export function PlatformTenants() {
                 <p className="font-slab text-lg font-bold leading-tight">{t.name}</p>
                 <a href={`/${t.slug}`} target="_blank" className="text-sm text-brasa-600 underline">/{t.slug}</a>
               </div>
-              <Badge tone={STATUS[t.status].tone}>{STATUS[t.status].label}</Badge>
+              {t.archived_at ? <Badge tone="neutral">Arquivada</Badge> : <Badge tone={STATUS[t.status].tone}>{STATUS[t.status].label}</Badge>}
             </div>
             <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
               <div><dt className="text-lenha-500">Plano</dt><dd className="font-semibold">{t.plan_name || '—'}</dd></div>
@@ -216,6 +219,7 @@ function TenantEditor({ tenant, plans, onClose, onDone }: { tenant: any; plans: 
   const [users, setUsers] = useState<any[]>([]);
   const [tab, setTab] = useState<'dados' | 'acessos' | 'suporte' | 'reiniciar'>('dados');
   const [reiniciar, setReiniciar] = useState(false);
+  const [excluir, setExcluir] = useState(false);
   const { run, busy } = useAction();
   const toast = useToast();
   const reloadUsers = () => get(`/api/platform/tenants/${tenant.id}/users`).then(setUsers);
@@ -225,7 +229,7 @@ function TenantEditor({ tenant, plans, onClose, onDone }: { tenant: any; plans: 
     trial_ends_at: f.trial_ends_at ? new Date(f.trial_ends_at + 'T23:59:59').toISOString() : null, document: f.document, contact_name: f.contact_name, contact_phone: f.contact_phone, contact_email: f.contact_email, notes: f.notes || '' })
     .then((r: any) => { if (r.slug_changed) toast('Endereço alterado: reimprima os QR Codes da empresa.', 'info'); onDone(); }), 'Empresa atualizada.');
   const enter = () => { const reason = prompt('Motivo do acesso de suporte (fica registrado para a empresa):'); if (reason && reason.length >= 3) run('i', () => post(`/api/platform/tenants/${tenant.id}/impersonate`, { reason }).then(() => { location.href = '/admin'; })); };
-  const TABS: [typeof tab, string][] = [['dados', 'Dados'], ['acessos', 'Acessos'], ['suporte', 'Suporte'], ['reiniciar', 'Reiniciar']];
+  const TABS: [typeof tab, string][] = [['dados', 'Dados'], ['acessos', 'Acessos'], ['suporte', 'Suporte'], ['reiniciar', 'Encerrar']];
   return (
     <Modal open side onClose={onClose} title={tenant.name}
       footer={tab === 'dados' ? <Button className="w-full" busy={busy === 's'} onClick={save}>Salvar alterações</Button> : undefined}>
@@ -261,13 +265,50 @@ function TenantEditor({ tenant, plans, onClose, onDone }: { tenant: any; plans: 
       )}
 
       {tab === 'reiniciar' && (
-        <section className="rounded-2xl border-2 border-alerta/40 bg-alerta/5 p-4">
-          <h3 className="font-slab text-lg font-bold text-alerta">Reiniciar empresa</h3>
-          <p className="mt-1 text-sm text-lenha-600">Apaga <strong>todos</strong> os pedidos, pagamentos, caixas, entregas, clientes e a auditoria da empresa, e remove a equipe, deixando só um administrador novo. <strong>Mantém</strong> o cardápio, a logo, as cores e as configurações. Use ao entregar o sistema para o cliente. Não dá para desfazer.</p>
-          <Button className="mt-3" variant="danger" onClick={() => setReiniciar(true)}>Reiniciar esta empresa</Button>
-        </section>
+        <div className="space-y-3">
+          <section className="rounded-2xl border-2 border-lenha-200 bg-white p-4">
+            <h3 className="font-slab text-lg font-bold">{tenant.archived_at ? 'Empresa arquivada' : 'Arquivar empresa'}</h3>
+            <p className="mt-1 text-sm text-lenha-600">{tenant.archived_at ? 'A empresa está fora da lista e sem acesso, mas os dados estão guardados. Você pode trazê-la de volta quando quiser.' : 'Tira a empresa da lista e bloqueia o acesso, mas guarda todos os dados. Dá para restaurar depois. É o jeito seguro de tirar uma empresa do ar.'}</p>
+            {tenant.archived_at
+              ? <Button className="mt-3" variant="outline" busy={busy === 'arc'} onClick={() => run('arc', () => post(`/api/platform/tenants/${tenant.id}/restore`, {}).then(onDone), 'Empresa restaurada.')}>Restaurar empresa</Button>
+              : <Button className="mt-3" variant="outline" busy={busy === 'arc'} onClick={() => run('arc', () => post(`/api/platform/tenants/${tenant.id}/archive`, {}).then(onDone), 'Empresa arquivada.')}>Arquivar empresa</Button>}
+          </section>
+          <section className="rounded-2xl border-2 border-alerta/40 bg-alerta/5 p-4">
+            <h3 className="font-slab text-lg font-bold text-alerta">Reiniciar empresa</h3>
+            <p className="mt-1 text-sm text-lenha-600">Apaga <strong>todos</strong> os pedidos, pagamentos, caixas, entregas, clientes e a auditoria da empresa, e remove a equipe, deixando só um administrador novo. <strong>Mantém</strong> o cardápio, a logo, as cores e as configurações. Use ao entregar o sistema para o cliente. Não dá para desfazer.</p>
+            <Button className="mt-3" variant="danger" onClick={() => setReiniciar(true)}>Reiniciar esta empresa</Button>
+          </section>
+          <section className="rounded-2xl border-2 border-alerta/40 bg-alerta/5 p-4">
+            <h3 className="font-slab text-lg font-bold text-alerta">Excluir empresa</h3>
+            <p className="mt-1 text-sm text-lenha-600">Apaga a empresa e <strong>todos</strong> os dados dela para sempre, inclusive o cardápio. Não dá para desfazer. Prefira arquivar, a não ser que queira apagar de vez (empresa de teste ou cliente que saiu e pediu para remover os dados).</p>
+            <Button className="mt-3" variant="danger" onClick={() => setExcluir(true)}>Excluir esta empresa</Button>
+          </section>
+        </div>
       )}
       {reiniciar && <ReiniciarEmpresa tenant={tenant} onClose={() => setReiniciar(false)} onDone={() => { setReiniciar(false); onDone(); }} />}
+      {excluir && <ExcluirEmpresa tenant={tenant} onClose={() => setExcluir(false)} onDone={() => { setExcluir(false); onDone(); }} />}
+    </Modal>
+  );
+}
+
+function ExcluirEmpresa({ tenant, onClose, onDone }: { tenant: any; onClose: () => void; onDone: () => void }) {
+  const [confirmName, setConfirmName] = useState('');
+  const [auth, setAuth] = useState({ username: '', password: '' });
+  const { run, busy } = useAction();
+  const pronto = confirmName.trim() === String(tenant.name).trim() && !!auth.username && !!auth.password;
+  return (
+    <Modal open onClose={onClose} title={`Excluir ${tenant.name}`} wide
+      footer={<Button variant="danger" className="w-full" busy={!!busy} disabled={!pronto}
+        onClick={() => run('x', () => del(`/api/platform/tenants/${tenant.id}`, { confirm_name: confirmName, auth }).then(onDone), 'Empresa excluída.')}>Excluir empresa para sempre</Button>}>
+      <div className="rounded-xl bg-alerta/10 p-3 text-sm text-lenha-700">Isto apaga <strong>para sempre</strong> a empresa <strong>{tenant.name}</strong> e tudo dela: pedidos, vendas, caixa, clientes, cardápio, usuários e a auditoria. Não dá para desfazer. Se tiver qualquer dúvida, use Arquivar.</div>
+      <div className="mt-4 space-y-3">
+        <Field label={`Digite o nome exato da empresa para confirmar (${tenant.name})`}><Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} placeholder={tenant.name} /></Field>
+        <p className="text-sm font-semibold">Sua senha de administrador da plataforma</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Usuário da plataforma"><Input value={auth.username} autoCapitalize="none" onChange={(e) => setAuth({ ...auth, username: e.target.value })} /></Field>
+          <Field label="Senha"><Input type="password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} /></Field>
+        </div>
+      </div>
     </Modal>
   );
 }

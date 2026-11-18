@@ -72,11 +72,14 @@ platformRouter.get('/overview', h(async (req) => {
   return { tenants, today, month, mrr };
 }));
 
-platformRouter.get('/tenants', h((req) => req.db.all(`SELECT t.id, t.slug, t.name, t.status, t.trial_ends_at, t.created_at, t.contact_name, t.contact_phone, t.contact_email, t.document, t.notes, t.plan_id, p.name plan_name,
+platformRouter.get('/tenants', h((req) => {
+  const archived = req.query.archived === '1'; // ?archived=1 lista as arquivadas
+  return req.db.all(`SELECT t.id, t.slug, t.name, t.status, t.archived_at, t.trial_ends_at, t.created_at, t.contact_name, t.contact_phone, t.contact_email, t.document, t.notes, t.plan_id, p.name plan_name,
   (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND u.active) users,
   (SELECT COUNT(*) FROM orders o WHERE o.tenant_id = t.id AND o.created_at >= NOW(3) - INTERVAL 30 DAY AND o.status <> 'cancelado') orders_30d,
   (SELECT MAX(o.created_at) FROM orders o WHERE o.tenant_id = t.id) last_order
-  FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id ORDER BY t.created_at DESC`)));
+  FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id WHERE t.archived_at IS ${archived ? 'NOT NULL' : 'NULL'} ORDER BY t.created_at DESC`);
+}));
 
 const slugSchema = z.string().min(3).max(50).regex(/^[a-z0-9]([a-z0-9-]{1,48}[a-z0-9])$/, 'Use letras minúsculas, números e hífen (ex.: pizzaria-do-joao).');
 platformRouter.post('/tenants', h(async (req) => {
@@ -182,6 +185,50 @@ platformRouter.post('/tenants/:id/reset', h(async (req) => {
   // Registro do ato de reinicialização (fica na auditoria da empresa, já zerada, como primeiro evento novo)
   await audit(req.db, { tenantId: tid, platformUserId, action: 'platform.tenant_reset', entity: 'tenant', entityId: tid,
     data: { tenant: tenant.slug, new_admin: b.admin.username }, ip: req.ip });
+  return { ok: true };
+}));
+
+// Arquivar: tira a empresa da lista e bloqueia o acesso, mas guarda todos os dados (reversível).
+platformRouter.post('/tenants/:id/archive', h(async (req) => {
+  const tid = Number(req.params.id);
+  const t = await req.db.get('SELECT id, slug, archived_at FROM tenants WHERE id = $1', [tid]);
+  if (!t) throw notFound('Empresa não encontrada.');
+  if (!t.archived_at) {
+    await req.db.tx(async (q) => {
+      await q.run('UPDATE tenants SET archived_at = NOW(3), updated_at = NOW(3) WHERE id = $1', [tid]);
+      await q.run("UPDATE sessions SET revoked = true WHERE kind = 'tenant' AND subject_id IN (SELECT id FROM users WHERE tenant_id = $1)", [tid]);
+    });
+    await audit(req.db, { tenantId: tid, platformUserId: P(req), action: 'platform.tenant_archive', entity: 'tenant', entityId: tid, data: { slug: t.slug }, ip: req.ip });
+  }
+  return { ok: true };
+}));
+// Restaurar: traz a empresa de volta.
+platformRouter.post('/tenants/:id/restore', h(async (req) => {
+  const tid = Number(req.params.id);
+  const r = await req.db.run('UPDATE tenants SET archived_at = NULL, updated_at = NOW(3) WHERE id = $1', [tid]);
+  if (!r.rowCount) throw notFound('Empresa não encontrada.');
+  await audit(req.db, { tenantId: tid, platformUserId: P(req), action: 'platform.tenant_restore', entity: 'tenant', entityId: tid, ip: req.ip });
+  return { ok: true };
+}));
+// Excluir de vez: apaga a empresa e todos os seus dados. Só o dono da plataforma, confirmando o nome e a senha.
+const WIPE_TABLES = ['nfce', 'order_items', 'payments', 'order_events', 'kitchen_tickets', 'cash_movements', 'orders', 'cash_sessions', 'customer_addresses', 'customers', 'dining_tables', 'delivery_zones', 'options', 'product_variants', 'option_groups', 'products', 'categories', 'expenses', 'settings', 'audit_log', 'users'];
+platformRouter.delete('/tenants/:id', h(async (req) => {
+  const b = z.object({ confirm_name: z.string(), auth: z.object({ username: z.string().max(60), password: z.string().max(200) }).optional() }).parse(req.body || {});
+  const tid = Number(req.params.id);
+  const t = await req.db.get('SELECT id, slug, name FROM tenants WHERE id = $1', [tid]);
+  if (!t) throw notFound('Empresa não encontrada.');
+  if (b.confirm_name.trim() !== t.name.trim()) throw bad('Para confirmar, digite o nome exato da empresa.');
+  const platformUserId = await authorizePlatform(req, b.auth);
+  await req.db.tx(async (q) => {
+    await q.run('SET @od_wipe = 1');
+    await q.run("DELETE FROM sessions WHERE kind = 'tenant' AND subject_id IN (SELECT id FROM users WHERE tenant_id = $1)", [tid]);
+    for (const tbl of WIPE_TABLES) await q.run(`DELETE FROM ${tbl} WHERE tenant_id = $1`, [tid]);
+    await q.run('UPDATE tenants SET logo_file_id = NULL, cover_file_id = NULL WHERE id = $1', [tid]);
+    await q.run('DELETE FROM files WHERE tenant_id = $1', [tid]);
+    await q.run('DELETE FROM tenants WHERE id = $1', [tid]);
+    await q.run('SET @od_wipe = NULL');
+  });
+  await audit(req.db, { platformUserId, action: 'platform.tenant_delete', entity: 'tenant', entityId: tid, data: { slug: t.slug, name: t.name }, ip: req.ip });
   return { ok: true };
 }));
 

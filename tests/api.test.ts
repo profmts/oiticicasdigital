@@ -601,3 +601,33 @@ test('36 R7: planos (3 criados), suporte e nota fiscal só com recurso no plano'
   // A flag fiscal_in_plan acompanha o plano.
   assert.equal(ok(await admin.get('/api/admin/settings')).fiscal_in_plan, true);
 });
+
+test('37 R8: arquivar, restaurar e excluir empresa (com trava)', async () => {
+  const r = ok(await plat.post('/api/platform/tenants', { name: 'Excluir Teste', slug: 'excluir-teste', admin: { name: 'Dono E', username: 'donoe', password: 'senhaForte123' }, tables: 2 }));
+  const tid = r.id;
+  // Cria dados reais para exercitar a exclusão em cascata.
+  const c = new Client(); await c.login('donoe', 'senhaForte123', 'excluir-teste');
+  const catId = ok(await c.post('/api/categories', { name: 'Cat E', sector: 'cozinha' })).id;
+  ok(await c.post('/api/products', { category_id: catId, name: 'Item E', order_types: ['balcao'], variants: [{ name: 'Único', price_cents: 500 }] }));
+
+  // Arquivar: some da lista padrão, aparece na lista de arquivadas, bloqueia o acesso.
+  ok(await plat.post(`/api/platform/tenants/${tid}/archive`, {}));
+  assert.ok(!ok(await plat.get('/api/platform/tenants')).some((t: any) => t.id === tid), 'arquivada some da lista');
+  assert.ok(ok(await plat.get('/api/platform/tenants?archived=1')).some((t: any) => t.id === tid), 'aparece em arquivadas');
+  assert.equal((await new Client().post('/api/auth/login', { company: 'excluir-teste', username: 'donoe', password: 'senhaForte123' })).status, 403, 'arquivada bloqueia login');
+
+  // Restaurar: volta para a lista e o acesso funciona.
+  ok(await plat.post(`/api/platform/tenants/${tid}/restore`, {}));
+  assert.ok(ok(await plat.get('/api/platform/tenants')).some((t: any) => t.id === tid), 'restaurada volta à lista');
+  assert.equal((await new Client().post('/api/auth/login', { company: 'excluir-teste', username: 'donoe', password: 'senhaForte123' })).status, 200, 'restaurada permite login');
+
+  // Excluir: trava pelo nome e pela senha da plataforma.
+  assert.equal((await plat.del(`/api/platform/tenants/${tid}`, { confirm_name: 'nome errado', auth: { username: 'root', password: 'senhaMuitoForte1' } })).status, 400, 'nome errado barra');
+  assert.equal((await plat.del(`/api/platform/tenants/${tid}`, { confirm_name: 'Excluir Teste', auth: { username: 'root', password: 'errada' } })).status, 403, 'senha errada barra');
+  ok(await plat.del(`/api/platform/tenants/${tid}`, { confirm_name: 'Excluir Teste', auth: { username: 'root', password: 'senhaMuitoForte1' } }));
+  // Sumiu de vez, com os dados.
+  assert.equal(await db.get('SELECT 1 FROM tenants WHERE id = $1', [tid]), undefined, 'empresa apagada');
+  assert.equal(await db.get('SELECT 1 FROM users WHERE tenant_id = $1', [tid]), undefined, 'usuários apagados');
+  assert.equal(await db.get('SELECT 1 FROM products WHERE tenant_id = $1', [tid]), undefined, 'produtos apagados');
+  assert.equal(await db.get('SELECT 1 FROM settings WHERE tenant_id = $1', [tid]), undefined, 'configurações apagadas');
+});
