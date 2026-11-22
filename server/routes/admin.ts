@@ -260,7 +260,7 @@ const fiscalSchema = z.object({
   cnpj: z.string().max(18), ie: z.string().max(20), regime: z.enum(['simples', 'mei', 'normal']),
   csc: z.string().max(120), csc_id: z.string().max(10), token: z.string().max(120), auto_emit: z.boolean(),
 }).partial();
-const requireFiscalPlan = (req: any) => { if (!planFiscal(req.tenant)) throw conflict('A nota fiscal faz parte do plano Máximo. Troque o plano desta loja para liberar a emissão.'); };
+const requireFiscalPlan = (req: any) => { if (!planFiscal(req.tenant)) throw conflict('A nota fiscal faz parte do plano Profissional. Troque o plano desta loja para liberar a emissão.'); };
 adminRouter.get('/settings/fiscal', requirePerm('settings.manage'), h(async (req) => {
   requireFiscalPlan(req);
   return { ...F.maskFiscal(await F.readFiscal(req.db, T(req))), checklist: await F.fiscalChecklist(req.db, T(req)) };

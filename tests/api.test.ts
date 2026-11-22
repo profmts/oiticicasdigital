@@ -586,18 +586,20 @@ test('36 R7: planos (3 criados), suporte e nota fiscal só com recurso no plano'
   // Os três planos de venda foram semeados pela migração.
   const plans = ok(await plat.get('/api/platform/plans'));
   const comeco = plans.find((p: any) => p.name === 'Começo');
-  const maximo = plans.find((p: any) => p.name === 'Máximo');
-  assert.ok(comeco && maximo, 'planos Começo e Máximo existem');
+  const maximo = plans.find((p: any) => p.name === 'Profissional');
+  assert.ok(comeco && maximo, 'planos Começo e Profissional existem');
   assert.equal(comeco.support, 'sem'); assert.equal(comeco.features.nota_fiscal, false);
   assert.equal(maximo.support, 'prioritario'); assert.equal(maximo.features.nota_fiscal, true);
   assert.equal(maximo.features.delivery, true); assert.equal(comeco.features.delivery, false);
+  assert.ok(plans.find((p: any) => p.name === 'Equipe'), 'plano Equipe existe');
+  assert.ok(plans.find((p: any) => p.name === 'Interno'), 'plano Interno existe');
   // Sem o recurso no plano, os endpoints fiscais são bloqueados.
   await db.run('UPDATE tenants SET plan_id = $1 WHERE slug = $2', [comeco.id, SLUG]);
   assert.equal((await admin.get('/api/admin/settings/fiscal')).status, 409, 'plano sem nota fiscal bloqueia');
   assert.equal((await admin.put('/api/admin/settings/fiscal', { enabled: true })).status, 409);
-  // Com o plano Máximo, libera de novo.
+  // Com o plano Profissional, libera de novo.
   await db.run('UPDATE tenants SET plan_id = $1 WHERE slug = $2', [maximo.id, SLUG]);
-  assert.equal((await admin.get('/api/admin/settings/fiscal')).status, 200, 'plano Máximo libera');
+  assert.equal((await admin.get('/api/admin/settings/fiscal')).status, 200, 'plano Profissional libera');
   // A flag fiscal_in_plan acompanha o plano.
   assert.equal(ok(await admin.get('/api/admin/settings')).fiscal_in_plan, true);
 });
