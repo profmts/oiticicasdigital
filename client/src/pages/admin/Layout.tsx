@@ -76,7 +76,7 @@ export default function AdminLayout() {
       <div>
         <p className="mb-1 px-3 text-xs font-semibold text-white/40">Telas da equipe</p>
         {can('kitchen.use') && feat('kds') && <a href="/cozinha" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">Tela da cozinha</a>}
-        {can('kitchen.use') && feat('kds') && <a href="/churrasqueira" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">Tela da churrasqueira</a>}
+        {can('kitchen.use') && feat('churrasqueira') && <a href="/churrasqueira" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">Tela da churrasqueira</a>}
         {can('tables.use') && feat('tables') && <a href="/garcom" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">App do garçom</a>}
         {can('delivery.courier') && feat('delivery') && <a href="/motoboy" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">App do motoboy</a>}
         {tenant && <a href={`/${tenant.slug}`} target="_blank" className="block rounded-xl px-3 py-2.5 font-semibold text-white/80 hover:bg-white/10">Cardápio digital</a>}

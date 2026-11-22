@@ -247,7 +247,7 @@ platformRouter.post('/tenants/:id/impersonate', h(async (req, res) => {
 const planSchema = z.object({
   name: z.string().min(2).max(60), description: z.string().max(400).default(''), price_cents: z.number().int().min(0).nullable(),
   max_users: z.number().int().min(1).nullable(), max_tables: z.number().int().min(0).nullable(), max_products: z.number().int().min(1).nullable(),
-  features: z.object({ delivery: z.boolean(), self_order: z.boolean(), kds: z.boolean(), reports: z.boolean(), tables: z.boolean().default(true), nota_fiscal: z.boolean().default(false) }),
+  features: z.object({ delivery: z.boolean(), self_order: z.boolean(), kds: z.boolean(), reports: z.boolean(), tables: z.boolean().default(true), churrasqueira: z.boolean().default(false), nota_fiscal: z.boolean().default(false) }),
   support: z.enum(['sem', 'agendado', 'prioritario']).default('sem'), active: z.boolean().default(true),
 });
 platformRouter.get('/plans', h((req) => req.db.all('SELECT p.*, (SELECT COUNT(*) FROM tenants t WHERE t.plan_id = p.id) tenants FROM plans p ORDER BY p.id')));

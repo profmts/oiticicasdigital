@@ -313,7 +313,7 @@ function ExcluirEmpresa({ tenant, onClose, onDone }: { tenant: any; onClose: () 
   );
 }
 
-const ROLE_PT: Record<string, string> = { admin: 'Administrador', gerente: 'Gerente', caixa: 'Caixa', garcom: 'Garçom', cozinha: 'Cozinha', motoboy: 'Motoboy' };
+const ROLE_PT: Record<string, string> = { admin: 'Administrador', gerente: 'Gerente', caixa: 'Caixa', garcom: 'Garçom', cozinha: 'Cozinha', churrasqueiro: 'Churrasqueiro', motoboy: 'Motoboy' };
 const SUPORTE_PT: Record<string, string> = { sem: 'sem suporte', agendado: 'agendado', prioritario: 'prioritário' };
 
 /** Aba Acessos: lista de usuários com redefinir senha por linha + adicionar administrador. */
@@ -385,7 +385,7 @@ export function PlatformPlans() {
   return (
     <div>
       <div className="mb-4 flex items-center"><h1 className="font-slab text-2xl font-bold">Planos</h1>
-        <Button className="ml-auto" onClick={() => setEdit({ name: '', description: '', price: '', max_users: '', max_tables: '', max_products: '', features: { delivery: true, self_order: true, kds: true, reports: true, tables: true, nota_fiscal: false }, support: 'sem', active: true })}>Novo plano</Button></div>
+        <Button className="ml-auto" onClick={() => setEdit({ name: '', description: '', price: '', max_users: '', max_tables: '', max_products: '', features: { delivery: true, self_order: true, kds: true, reports: true, tables: true, churrasqueira: true, nota_fiscal: false }, support: 'sem', active: true })}>Novo plano</Button></div>
       <p className="mb-4 text-sm text-lenha-600">Limites vazios = ilimitado. O preço é informativo até a cobrança automática ser integrada (ver documentação).</p>
       <div className="grid gap-3 md:grid-cols-3">
         {list.map((p) => (
@@ -399,7 +399,7 @@ export function PlatformPlans() {
               <li>Nota fiscal: {p.features.nota_fiscal ? 'sim' : 'não'} · Suporte: {SUPORTE_PT[p.support] || 'sem suporte'}</li>
             </ul>
             <p className="mt-2 text-xs text-lenha-500">{p.tenants} empresa(s)</p>
-            <Button size="sm" variant="outline" className="mt-3" onClick={() => setEdit({ ...p, features: { tables: true, nota_fiscal: false, ...p.features }, support: p.support || 'sem', price: p.price_cents == null ? '' : centsToInput(p.price_cents), max_users: p.max_users ?? '', max_tables: p.max_tables ?? '', max_products: p.max_products ?? '' })}>Editar</Button>
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => setEdit({ ...p, features: { tables: true, churrasqueira: true, nota_fiscal: false, ...p.features }, support: p.support || 'sem', price: p.price_cents == null ? '' : centsToInput(p.price_cents), max_users: p.max_users ?? '', max_tables: p.max_tables ?? '', max_products: p.max_products ?? '' })}>Editar</Button>
           </article>
         ))}
       </div>
@@ -425,7 +425,7 @@ function PlanEditor({ initial, onClose, onDone }: { initial: any; onClose: () =>
         <Field label="Máx. produtos"><Input inputMode="numeric" value={f.max_products} onChange={(e) => setF({ ...f, max_products: e.target.value })} placeholder="ilimitado" /></Field>
       </div>
       <div className="mt-4 space-y-3">
-        {([['tables', 'Mesas (atendidas pelo garçom)'], ['kds', 'Tela da cozinha'], ['reports', 'Relatórios e exportação'], ['self_order', 'Cliente pede pelo cardápio (QR na mesa e balcão)'], ['delivery', 'Delivery e retirada pelo cardápio'], ['nota_fiscal', 'Nota fiscal (NFC-e)']] as const).map(([k, l]) => (
+        {([['tables', 'Mesas (atendidas pelo garçom)'], ['kds', 'Tela da cozinha'], ['churrasqueira', 'Tela da churrasqueira'], ['reports', 'Relatórios e exportação'], ['self_order', 'Cliente pede pelo cardápio (QR na mesa e balcão)'], ['delivery', 'Delivery e retirada pelo cardápio'], ['nota_fiscal', 'Nota fiscal (NFC-e)']] as const).map(([k, l]) => (
           <Toggle key={k} checked={!!f.features[k]} onChange={(v) => setF({ ...f, features: { ...f.features, [k]: v } })} label={l} />
         ))}
         <Field label="Suporte"><Select value={f.support || 'sem'} onChange={(e) => setF({ ...f, support: e.target.value })}><option value="sem">Sem suporte</option><option value="agendado">Suporte agendado</option><option value="prioritario">Suporte prioritário</option></Select></Field>
