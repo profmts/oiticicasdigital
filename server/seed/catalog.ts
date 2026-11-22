@@ -78,7 +78,7 @@ export function defaultSettings(name: string): Record<string, unknown> {
       { id: 'dinheiro', name: 'Dinheiro', active: true, online: true }, { id: 'pix', name: 'Pix', active: true, online: true },
       { id: 'debito', name: 'Cartão de débito', active: true, online: true }, { id: 'credito', name: 'Cartão de crédito', active: true, online: true },
     ],
-    pix_key: '', banners: [], kitchen_sectors: ['cozinha', 'bebidas'], timezone: 'America/Fortaleza',
+    pix_key: '', banners: [], kitchen_sectors: ['cozinha', 'bebidas'], churrasqueira_sector: 'espetos', timezone: 'America/Fortaleza',
     // Pedido presencial pelo QR Code
     self_order_enabled: true,          // QR das mesas aceita pedidos
     self_order_auto_kitchen: false,    // false = garçom/caixa confirma antes de ir para a cozinha
@@ -100,7 +100,7 @@ export const ESPETINHO_SETTINGS: Record<string, unknown> = {
     { title: 'Combo completo', subtitle: 'Baião + arroz de leite, farofa, vinagrete, macaxeira e qualquer espeto', category: 'Combos' },
     { title: 'Gelada do seu jeito', subtitle: 'Cervejas, long necks, sucos naturais e refrigerantes', category: 'Cervejas' },
   ],
-  kitchen_sectors: ['espetos', 'porcoes', 'bebidas'],
+  kitchen_sectors: ['espetos', 'porcoes', 'bebidas'], churrasqueira_sector: 'espetos',
   brand_color: '#f07a1a', brand_dark: '#2b1a10', menu_font: 'slab',
 };
 

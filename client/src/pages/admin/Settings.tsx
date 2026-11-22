@@ -21,7 +21,7 @@ const ALL_KEYS = [
   'store_name', 'slogan', 'whatsapp', 'whatsapp_display', 'address', 'city', 'instagram', 'timezone',
   'closed_message', 'accept_delivery', 'accept_pickup', 'allow_unlisted_neighborhood', 'min_order_cents',
   'delivery_estimate_minutes', 'pickup_estimate_minutes', 'prep_alert_minutes', 'payment_methods', 'pix_key',
-  'banners', 'kitchen_sectors', 'self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled',
+  'banners', 'kitchen_sectors', 'churrasqueira_sector', 'self_order_enabled', 'self_order_auto_kitchen', 'self_order_counter_enabled',
   'hide_table_13', 'team_pin', 'brand_color', 'brand_dark', 'menu_font',
 ];
 
@@ -125,6 +125,7 @@ export default function Settings() {
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Alerta de atraso (minutos)" hint="Pedidos acima deste tempo ficam em vermelho no Kanban e na cozinha."><Input inputMode="numeric" value={s.prep_alert_minutes} onChange={(e) => set('prep_alert_minutes', Number(e.target.value.replace(/\D/g, '')) || 1)} /></Field>
           <Field label="Setores de preparo" hint="Separados por vírgula. Ex.: espetos, porcoes, bebidas"><Input value={s.kitchen_sectors.join(', ')} onChange={(e) => set('kitchen_sectors', e.target.value.split(',').map((x: string) => x.trim()).filter(Boolean))} /></Field>
+          <Field label="Setor da churrasqueira" hint="Qual setor vai para a tela do churrasqueiro (os espetos). O resto vai para a cozinha."><Input value={s.churrasqueira_sector || 'espetos'} onChange={(e) => set('churrasqueira_sector', e.target.value.trim())} /></Field>
         </div>
       </Section>
 

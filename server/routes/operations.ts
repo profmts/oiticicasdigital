@@ -318,6 +318,7 @@ opsRouter.post('/tickets/:id/served', requirePerm('tables.use', 'orders.manage')
 // ---------- Cozinha (KDS) ----------
 opsRouter.get('/kitchen/tickets', requirePerm('kitchen.use', 'orders.manage'), h(async (req) => {
   const sector = req.query.sector ? String(req.query.sector) : null;
+  const exclude = req.query.exclude ? String(req.query.exclude) : null;
   const history = req.query.history === '1';
   const ts = await req.db.all(`SELECT k.*, o.number, o.type, o.channel, o.priority, o.notes order_notes, o.customer_name, tb.label table_label, w.name waiter_name
     FROM kitchen_tickets k JOIN orders o ON o.id = k.order_id LEFT JOIN dining_tables tb ON tb.id = o.table_id LEFT JOIN users w ON w.id = o.waiter_id
@@ -328,14 +329,14 @@ opsRouter.get('/kitchen/tickets', requirePerm('kitchen.use', 'orders.manage'), h
     id: t.id, order_id: t.order_id, number: t.number, seq: t.seq, type: t.type, channel: t.channel, priority: t.priority, status: t.status,
     table_label: t.table_label, waiter_name: t.waiter_name, customer_first_name: (t.customer_name || '').split(' ')[0] || null,
     created_at: t.created_at, started_at: t.started_at, ready_at: t.ready_at, note: [t.order_notes, t.note].filter(Boolean).join(' · '), question: t.question,
-    items: items.filter((i) => i.ticket_id === t.id && (!sector || i.sector === sector)).map((i) => ({ ...i, options: i.options_json, options_json: undefined })),
+    items: items.filter((i) => i.ticket_id === t.id && (!sector || i.sector === sector) && (!exclude || i.sector !== exclude)).map((i) => ({ ...i, options: i.options_json, options_json: undefined })),
   })).filter((t) => t.items.length > 0)
-    .filter((t) => history || !sector || t.items.some((i: any) => !['pronto', 'entregue', 'cancelado'].includes(i.status)) || t.status === 'pronto');
+    .filter((t) => history || !(sector || exclude) || t.items.some((i: any) => !['pronto', 'entregue', 'cancelado'].includes(i.status)) || t.status === 'pronto');
 }));
 
 opsRouter.post('/kitchen/tickets/:id/status', requirePerm('kitchen.use', 'orders.manage'), h(async (req) => {
-  const { to, sector } = z.object({ to: z.enum(['preparo', 'pronto']), sector: z.string().max(30).optional() }).parse(req.body);
-  await O.setTicketStatus(req.db, T(req), id(req), to, req.user!, sector);
+  const { to, sector, exclude } = z.object({ to: z.enum(['preparo', 'pronto']), sector: z.string().max(30).optional(), exclude: z.string().max(30).optional() }).parse(req.body);
+  await O.setTicketStatus(req.db, T(req), id(req), to, req.user!, sector, exclude);
   return { ok: true };
 }));
 opsRouter.post('/kitchen/items/:id/status', requirePerm('kitchen.use', 'orders.manage'), h(async (req) => {
