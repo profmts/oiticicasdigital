@@ -118,6 +118,7 @@ export default function Kitchen() {
                 </div>
                 {t.note && <p className="bg-ouro-300 px-4 py-2 text-lg font-semibold">{t.note}</p>}
                 {t.question && <p className="bg-red-100 px-4 py-2 font-semibold text-alerta">Dúvida enviada: {t.question}</p>}
+                {t.answer && <p className="flex items-center justify-between gap-2 bg-green-100 px-4 py-2 font-semibold text-green-800">Resposta do salão: {t.answer}<button onClick={() => act(`ans${t.id}`, () => post(`/api/kitchen/tickets/${t.id}/answer`, { text: '' }))} className="shrink-0 rounded-lg bg-white/70 px-3 py-1 text-sm">Ok, entendi</button></p>}
                 <ul className="flex-1 divide-y divide-lenha-100 px-2">
                   {t.items.map((i: any) => {
                     const done = ['pronto', 'entregue'].includes(i.status);

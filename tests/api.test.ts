@@ -669,3 +669,24 @@ test('39 R12: perfil churrasqueiro e churrasqueira como recurso de plano', async
   assert.equal((await c.get('/api/kitchen/tickets?sector=espetos')).status, 200, 'acessa a churrasqueira');
   assert.equal((await c.get('/api/admin/users')).status, 403, 'não acessa o painel admin');
 });
+
+test('40 R13: cozinha pergunta e o salão responde', async () => {
+  const body = { idempotency_key: 'k-ans-0001', type: 'retirada', customer_name: 'Rê', customer_phone: '83999992222',
+    items: [{ variant_id: variant('Espeto de carne'), qty: 1 }, { variant_id: variant('Coca-Cola 1L'), qty: 1 }] };
+  const r = ok(await publico.post(`/api/public/${SLUG}/orders`, body));
+  const oid = (await db.get('SELECT id FROM orders WHERE public_token = $1', [r.token])).id;
+  ok(await caixa.post(`/api/orders/${oid}/confirm`, {}));
+  const t = ok(await cozinha.get('/api/kitchen/tickets')).find((x: any) => x.order_id === oid);
+  // Cozinha pergunta.
+  ok(await cozinha.post(`/api/kitchen/tickets/${t.id}/question`, { text: 'Arroz branco ou vermelho?' }));
+  assert.equal(ok(await cozinha.get('/api/kitchen/tickets')).find((x: any) => x.id === t.id).question, 'Arroz branco ou vermelho?');
+  // O salão (caixa) responde: limpa a pergunta e grava a resposta.
+  const od = ok(await caixa.post(`/api/kitchen/tickets/${t.id}/answer`, { text: 'Branco' }));
+  assert.ok(od.tickets.find((x: any) => x.id === t.id), 'retorna o pedido atualizado');
+  const t2 = ok(await cozinha.get('/api/kitchen/tickets')).find((x: any) => x.id === t.id);
+  assert.equal(t2.question, null, 'pergunta resolvida');
+  assert.equal(t2.answer, 'Branco', 'cozinha vê a resposta');
+  // Cozinha confirma que leu: limpa a resposta.
+  ok(await cozinha.post(`/api/kitchen/tickets/${t.id}/answer`, { text: '' }));
+  assert.equal(ok(await cozinha.get('/api/kitchen/tickets')).find((x: any) => x.id === t.id).answer, null, 'resposta limpa');
+});

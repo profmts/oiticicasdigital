@@ -328,7 +328,7 @@ opsRouter.get('/kitchen/tickets', requirePerm('kitchen.use', 'orders.manage'), h
   return ts.map((t) => ({
     id: t.id, order_id: t.order_id, number: t.number, seq: t.seq, type: t.type, channel: t.channel, priority: t.priority, status: t.status,
     table_label: t.table_label, waiter_name: t.waiter_name, customer_first_name: (t.customer_name || '').split(' ')[0] || null,
-    created_at: t.created_at, started_at: t.started_at, ready_at: t.ready_at, note: [t.order_notes, t.note].filter(Boolean).join(' · '), question: t.question,
+    created_at: t.created_at, started_at: t.started_at, ready_at: t.ready_at, note: [t.order_notes, t.note].filter(Boolean).join(' · '), question: t.question, answer: t.answer,
     items: items.filter((i) => i.ticket_id === t.id && (!sector || i.sector === sector) && (!exclude || i.sector !== exclude)).map((i) => ({ ...i, options: i.options_json, options_json: undefined })),
   })).filter((t) => t.items.length > 0)
     .filter((t) => history || !(sector || exclude) || t.items.some((i: any) => !['pronto', 'entregue', 'cancelado'].includes(i.status)) || t.status === 'pronto');
@@ -352,6 +352,21 @@ opsRouter.post('/kitchen/tickets/:id/question', requirePerm('kitchen.use', 'orde
   await O.event(req.db, T(req), t.order_id, text.trim() ? 'kitchen_question' : 'kitchen_answer', req.user!.id, text.trim() || 'Dúvida respondida');
   broadcast(T(req), 'orders', { kind: text.trim() ? 'question' : 'answer', orderId: t.order_id });
   return { ok: true };
+}));
+// O salão (garçom/caixa) responde à dúvida da cozinha; limpa a pergunta e registra a resposta.
+opsRouter.post('/kitchen/tickets/:id/answer', requirePerm('tables.use', 'orders.manage', 'pdv.use', 'payments.receive', 'kitchen.use'), h(async (req) => {
+  const { text } = z.object({ text: z.string().max(300) }).parse(req.body);
+  const t = await req.db.get('SELECT * FROM kitchen_tickets WHERE id = $1 AND tenant_id = $2', [id(req), T(req)]);
+  if (!t) throw notFound('Ticket não encontrado.');
+  const ans = text.trim();
+  if (ans) {
+    await req.db.run('UPDATE kitchen_tickets SET answer = $1, question = NULL WHERE id = $2', [ans.slice(0, 300), t.id]);
+    await O.event(req.db, T(req), t.order_id, 'kitchen_answer', req.user!.id, `Resposta do salão: ${ans}`);
+  } else {
+    await req.db.run('UPDATE kitchen_tickets SET answer = NULL WHERE id = $1', [t.id]); // cozinha confirma que leu
+  }
+  broadcast(T(req), 'orders', { kind: 'answer', orderId: t.order_id });
+  return O.orderDetail(req.db, T(req), t.order_id, req.user!);
 }));
 
 // ---------- Motoboy ----------

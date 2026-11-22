@@ -107,6 +107,8 @@ function TableOrder({ orderId, admin, onClose, onPay }: { orderId: number; admin
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cancelItem, setCancelItem] = useState<any>(null);
   const [transfer, setTransfer] = useState(false);
+  const [answering, setAnswering] = useState<number | null>(null);
+  const [answerText, setAnswerText] = useState('');
   const { run, busy } = useAction();
   const now = useNow(30000);
   const load = () => get(`/api/orders/${orderId}`).then(setO);
@@ -152,7 +154,18 @@ function TableOrder({ orderId, admin, onClose, onPay }: { orderId: number; admin
               {t ? <>Rodada {t.seq} · {time(t.created_at)}</> : <span className="text-alerta">Aguardando confirmação para a cozinha</span>}
               {t && <Badge tone={t.status === 'pronto' ? 'ok' : t.status === 'entregue' ? 'neutral' : 'brasa'}>{t.status === 'novo' ? 'na fila' : t.status === 'preparo' ? `na brasa · ${elapsed(minutesSince(t.started_at || t.created_at, now))}` : t.status === 'pronto' ? 'pronto' : t.status === 'entregue' ? 'servido' : t.status}</Badge>}
               {t?.question && <Badge tone="alerta">Cozinha pergunta: {t.question}</Badge>}
+              {t?.question && <button className="text-xs font-semibold text-brasa-700 underline" onClick={() => { setAnswering(t.id); setAnswerText(''); }}>Responder</button>}
+              {t?.answer && !t?.question && <Badge tone="ok">Você respondeu: {t.answer}</Badge>}
             </h3>
+            {answering === tid && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {['Branco', 'Vermelho', 'Pode ser qualquer um'].map((s) => <button key={s} onClick={() => setAnswerText(s)} className="rounded-full bg-lenha-100 px-3 py-1 text-xs font-semibold">{s}</button>)}
+                <div className="flex w-full gap-2">
+                  <Input value={answerText} onChange={(e) => setAnswerText(e.target.value)} placeholder="Responder à cozinha" maxLength={200} />
+                  <Button busy={busy === 'ans'} disabled={!answerText.trim()} onClick={() => run('ans', () => post(`/api/kitchen/tickets/${tid}/answer`, { text: answerText }).then((x) => { setO(x); setAnswering(null); }), 'Resposta enviada à cozinha.')}>Enviar</Button>
+                </div>
+              </div>
+            )}
             <ul className="divide-y divide-lenha-100 rounded-2xl bg-white ring-1 ring-lenha-100">
               {its.map((i: any) => (
                 <li key={i.id} className={cx('flex items-start gap-3 px-3 py-2', i.status === 'cancelado' && 'opacity-50')}>
