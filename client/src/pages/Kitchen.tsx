@@ -27,6 +27,7 @@ export default function Kitchen() {
   const [ask, setAsk] = useState<any>(null);
   const { run, busy } = useAction();
   const alertMin = settings.data?.prep_alert_minutes || 25;
+  const churras = settings.data?.churrasqueira_sector || 'espetos'; // setor que vai para a churrasqueira, não para a cozinha
 
   // Pedido novo: som + aviso em texto dizendo o número e a origem.
   useEffect(() => {
@@ -99,7 +100,9 @@ export default function Kitchen() {
           {list.map((t) => {
             const mins = minutesSince(t.created_at, now);
             const late = !isHistory && t.status !== 'pronto' && mins >= alertMin;
-            const pending = t.items.filter((i: any) => ['enviado', 'preparo'].includes(i.status));
+            const pending = t.items.filter((i: any) => ['enviado', 'preparo'].includes(i.status) && i.sector !== churras);
+            const hasCozinha = t.items.some((i: any) => i.sector !== churras);
+            const churrasPending = t.items.some((i: any) => i.sector === churras && ['enviado', 'preparo'].includes(i.status));
             return (
               <article key={t.id} className={cx('ticket flex flex-col rounded-b-2xl text-lenha-900 shadow-xl', fresh.has(t.id) && 'pulse-new')}>
                 <div className={cx('flex items-start justify-between gap-2 px-4 pb-2 pt-3', late ? 'bg-alerta text-white' : t.status === 'pronto' ? 'bg-ok text-white' : t.status === 'preparo' ? 'bg-ouro-400' : 'bg-lenha-100')}>
@@ -118,17 +121,19 @@ export default function Kitchen() {
                 <ul className="flex-1 divide-y divide-lenha-100 px-2">
                   {t.items.map((i: any) => {
                     const done = ['pronto', 'entregue'].includes(i.status);
+                    const isChurras = i.sector === churras;
                     return (
                       <li key={i.id}>
-                        <button disabled={isHistory || done || i.status === 'cancelado'} onClick={() => act(`i${i.id}`, () => post(`/api/kitchen/items/${i.id}/status`, { to: 'pronto' }))}
-                          className={cx('flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left', !isHistory && !done && 'hover:bg-lenha-50', (done || i.status === 'cancelado') && 'opacity-40')}>
+                        <button disabled={isHistory || done || i.status === 'cancelado' || isChurras} onClick={() => act(`i${i.id}`, () => post(`/api/kitchen/items/${i.id}/status`, { to: 'pronto' }))}
+                          className={cx('flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left', !isHistory && !done && !isChurras && 'hover:bg-lenha-50', (done || i.status === 'cancelado') && 'opacity-40', isChurras && 'opacity-70')}>
                           <span className="font-cond text-3xl font-bold leading-none tabnums">{i.qty}</span>
                           <span className="flex-1">
                             <span className={cx('block text-xl font-semibold leading-tight', (done || i.status === 'cancelado') && 'line-through')}>{i.name}{i.variant_name && ` · ${i.variant_name}`}</span>
                             {i.options.length > 0 && <span className="block text-lg">{i.options.map((x: any) => x.name).join(', ')}</span>}
                             {i.notes && <span className="mt-0.5 block rounded bg-ouro-300 px-2 text-lg font-bold">{i.notes}</span>}
+                            {isChurras && <span className="mt-0.5 inline-block rounded bg-brasa-100 px-2 text-sm font-bold text-brasa-700">🔥 na churrasqueira{done ? ' · pronto' : i.status === 'preparo' ? ' · em preparo' : ''}</span>}
                           </span>
-                          {done && <span className="text-sm font-bold text-ok">Pronto</span>}
+                          {done && !isChurras && <span className="text-sm font-bold text-ok">Pronto</span>}
                         </button>
                       </li>
                     );
@@ -137,9 +142,11 @@ export default function Kitchen() {
                 {!isHistory && (
                   <div className="flex gap-2 border-t border-lenha-100 p-3">
                     <button onClick={() => setAsk(t)} className="h-14 rounded-xl bg-lenha-100 px-4 font-semibold" aria-label="Pedir esclarecimento ao atendimento">?</button>
-                    {t.status === 'novo' && <Button size="lg" className="flex-1" variant="dark" busy={busy === `s${t.id}`} onClick={() => act(`s${t.id}`, () => post(`/api/kitchen/tickets/${t.id}/status`, { to: 'preparo' }))}>Aceitar e iniciar</Button>}
-                    {pending.length > 0 && t.status !== 'novo' && <Button size="lg" variant="success" className="flex-1" busy={busy === `p${t.id}`} onClick={() => act(`p${t.id}`, () => post(`/api/kitchen/tickets/${t.id}/status`, { to: 'pronto' }))}>Pedido pronto</Button>}
-                    {pending.length === 0 && <p className="flex flex-1 items-center justify-center font-semibold text-ok">Pronto · aguardando retirada</p>}
+                    {!hasCozinha ? <p className="flex flex-1 items-center justify-center font-semibold text-brasa-700">🔥 Só espetos · na churrasqueira</p>
+                      : t.status === 'novo' ? <Button size="lg" className="flex-1" variant="dark" busy={busy === `s${t.id}`} onClick={() => act(`s${t.id}`, () => post(`/api/kitchen/tickets/${t.id}/status`, { to: 'preparo', exclude: churras }))}>Aceitar e iniciar</Button>
+                      : pending.length > 0 ? <Button size="lg" variant="success" className="flex-1" busy={busy === `p${t.id}`} onClick={() => act(`p${t.id}`, () => post(`/api/kitchen/tickets/${t.id}/status`, { to: 'pronto', exclude: churras }))}>Pedido pronto</Button>
+                      : churrasPending ? <p className="flex flex-1 items-center justify-center font-semibold text-ouro-600">Cozinha pronta · aguardando churrasqueira</p>
+                      : <p className="flex flex-1 items-center justify-center font-semibold text-ok">Pronto · aguardando retirada</p>}
                   </div>
                 )}
               </article>

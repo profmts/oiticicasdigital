@@ -13,6 +13,7 @@ export function TeamScreensMenu({ dark = false, current }: { dark?: boolean; cur
   if (!me) return null;
   const screens = [
     can('kitchen.use') && { to: '/cozinha', label: 'Cozinha' },
+    can('kitchen.use') && { to: '/churrasqueira', label: 'Churrasqueira' },
     can('tables.use') && { to: '/garcom', label: 'Garçom' },
     can('delivery.courier') && { to: '/motoboy', label: 'Motoboy' },
     tenant && { to: `/${tenant.slug}`, label: 'Cardápio' },

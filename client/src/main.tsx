@@ -25,6 +25,7 @@ const Settings = lazy(() => import('./pages/admin/Settings'));
 const QrCodes = lazy(() => import('./pages/admin/QrCodes'));
 const Audit = lazy(() => import('./pages/admin/Audit'));
 const Kitchen = lazy(() => import('./pages/Kitchen'));
+const Churrasqueira = lazy(() => import('./pages/Churrasqueira'));
 const Waiter = lazy(() => import('./pages/Waiter'));
 const Courier = lazy(() => import('./pages/Courier'));
 const Receipt = lazy(() => import('./pages/Receipt'));
@@ -65,6 +66,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="auditoria" element={<P.Audit />} />
               </Route>
               <Route path="/cozinha" element={<Guard perm="kitchen.use"><Kitchen /></Guard>} />
+              <Route path="/churrasqueira" element={<Guard perm="kitchen.use"><Churrasqueira /></Guard>} />
               <Route path="/garcom" element={<Guard perm="tables.use"><Waiter /></Guard>} />
               <Route path="/motoboy" element={<Guard perm="delivery.courier"><Courier /></Guard>} />
               <Route path="/imprimir/:id" element={<Guard><Receipt /></Guard>} />

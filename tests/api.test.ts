@@ -633,3 +633,25 @@ test('37 R8: arquivar, restaurar e excluir empresa (com trava)', async () => {
   assert.equal(await db.get('SELECT 1 FROM products WHERE tenant_id = $1', [tid]), undefined, 'produtos apagados');
   assert.equal(await db.get('SELECT 1 FROM settings WHERE tenant_id = $1', [tid]), undefined, 'configurações apagadas');
 });
+
+test('38 R11: churrasqueira e cozinha separadas por setor', async () => {
+  // Pedido com um espeto (setor espetos) e uma bebida (outro setor).
+  const body = { idempotency_key: 'k-churras-1', type: 'retirada', customer_name: 'Bia', customer_phone: '83999991111',
+    items: [{ variant_id: variant('Espeto de carne'), qty: 2 }, { variant_id: variant('Coca-Cola 1L'), qty: 1 }] };
+  const r = ok(await publico.post(`/api/public/${SLUG}/orders`, body));
+  const oid = (await db.get('SELECT id FROM orders WHERE public_token = $1', [r.token])).id;
+  ok(await caixa.post(`/api/orders/${oid}/confirm`, {}));
+  // A churrasqueira vê só os espetos.
+  const tC = ok(await cozinha.get('/api/kitchen/tickets?sector=espetos')).find((x: any) => x.order_id === oid);
+  assert.ok(tC, 'ticket aparece na churrasqueira');
+  assert.ok(tC.items.length > 0 && tC.items.every((i: any) => i.sector === 'espetos'), 'só espetos na churrasqueira');
+  // A cozinha (exceto espetos) vê só o que não é espeto.
+  const tK = ok(await cozinha.get('/api/kitchen/tickets?exclude=espetos')).find((x: any) => x.order_id === oid);
+  assert.ok(tK && tK.items.length > 0 && tK.items.every((i: any) => i.sector !== 'espetos'), 'cozinha sem espetos');
+  // Cozinha marca pronto, exceto espetos: o pedido ainda não fica pronto (faltam os espetos).
+  ok(await cozinha.post(`/api/kitchen/tickets/${tK.id}/status`, { to: 'pronto', exclude: 'espetos' }));
+  assert.notEqual(ok(await admin.get(`/api/orders/${oid}`)).status, 'pronto', 'espetos ainda pendentes');
+  // Churrasqueiro marca os espetos: agora o pedido fica pronto.
+  ok(await cozinha.post(`/api/kitchen/tickets/${tC.id}/status`, { to: 'pronto', sector: 'espetos' }));
+  assert.equal(ok(await admin.get(`/api/orders/${oid}`)).status, 'pronto', 'pedido pronto com tudo feito');
+});

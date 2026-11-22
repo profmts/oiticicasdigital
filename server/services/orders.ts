@@ -367,15 +367,16 @@ async function setStatusRaw(q: Q, t: number, o: any, to: string, userId: number 
   await event(q, t, o.id, 'status', userId, note, o.status, to);
 }
 
-export async function setTicketStatus(db: DB, t: number, ticketId: number, to: 'preparo' | 'pronto' | 'entregue', user: SessionUser, sector?: string) {
+export async function setTicketStatus(db: DB, t: number, ticketId: number, to: 'preparo' | 'pronto' | 'entregue', user: SessionUser, sector?: string, exclude?: string) {
   await db.tx(async (q) => {
     const tk = await q.get('SELECT * FROM kitchen_tickets WHERE id = $1 AND tenant_id = $2 FOR UPDATE', [ticketId, t]);
     if (!tk) throw notFound('Ticket não encontrado.');
     if (tk.status === 'cancelado') throw conflict('Ticket cancelado.');
     const order = await getOrder(q, t, tk.order_id);
     if (order.status === 'cancelado') throw conflict('Pedido cancelado.');
-    const sf = sector ? ' AND sector = $2' : '';
-    const p = sector ? [ticketId, sector] : [ticketId];
+    // sector = só esse setor; exclude = todos menos esse setor (ex.: a cozinha marca tudo menos a churrasqueira).
+    const sf = sector ? ' AND sector = $2' : exclude ? ' AND sector <> $2' : '';
+    const p = sector ? [ticketId, sector] : exclude ? [ticketId, exclude] : [ticketId];
     if (to === 'preparo') {
       await q.run(`UPDATE order_items SET status='preparo' WHERE ticket_id=$1 AND status='enviado' ${sf}`, p);
       await q.run("UPDATE kitchen_tickets SET accepted_at = COALESCE(accepted_at, NOW(3)), started_at = COALESCE(started_at, NOW(3)), status = CASE WHEN status='novo' THEN 'preparo' ELSE status END WHERE id=$1", [ticketId]);
