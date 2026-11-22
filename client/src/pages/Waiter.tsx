@@ -227,7 +227,7 @@ function TransferDialog({ order, onClose, onDone }: { order: any; onClose: () =>
 }
 
 export default function Waiter() {
-  const { me, logout, tenant } = useAuth();
+  const { me, tenant } = useAuth();
   const online = useConnection();
   return (
     <div className="tela-equipe min-h-dvh pb-8">
@@ -236,8 +236,6 @@ export default function Waiter() {
         <div className="leading-tight"><p className="font-slab text-lg font-bold">Mesas</p><p className="text-sm text-lenha-200">{me?.name}</p></div>
         <span className={cx('ml-auto size-2.5 rounded-full', online ? 'bg-green-400' : 'bg-red-400')} title={online ? 'Conectado' : 'Reconectando'} />
         <TeamScreensMenu dark current="/garcom" />
-        {me?.home?.startsWith('/admin') && <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = me.home))} className="flex h-9 items-center gap-1 rounded-full bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar à tela anterior"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Voltar</button>}
-        <button onClick={logout} className="h-9 rounded-full px-3 text-sm font-semibold hover:bg-white/10">Sair</button>
       </header>
       <main className="p-3"><TablesBoard /></main>
     </div>
