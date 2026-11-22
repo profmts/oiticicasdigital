@@ -220,7 +220,7 @@ async function fiscalItems(req: Request, orderId: number) {
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id WHERE i.order_id = $1 AND i.status <> 'cancelado' ORDER BY i.id`, [orderId]);
 }
 opsRouter.post('/orders/:id/nfce', requirePerm('payments.receive', 'orders.manage'), h(async (req) => {
-  if (!planFiscal(req.tenant)) throw conflict('A nota fiscal faz parte do plano Máximo.');
+  if (!planFiscal(req.tenant)) throw conflict('A nota fiscal faz parte do plano Profissional.');
   const { cpf } = z.object({ cpf: z.string().max(14).nullable().optional() }).parse(req.body || {});
   const o = await loadForUser(req, id(req));
   const items = await fiscalItems(req, o.id);
