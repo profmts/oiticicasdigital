@@ -10,7 +10,7 @@ import { TeamScreensMenu } from '../components/TeamNav';
 const PAY: Record<string, string> = { dinheiro: 'Dinheiro', pix: 'Pix', debito: 'Débito', credito: 'Crédito' };
 
 export default function Courier() {
-  const { me, logout, tenant } = useAuth();
+  const { me, tenant } = useAuth();
   const online = useConnection();
   const { data, reload } = useData<any>('/api/courier/deliveries', ['orders'], 20000);
   const [methods, setMethods] = useState<any[]>([]);
@@ -39,8 +39,6 @@ export default function Courier() {
         <div className="leading-tight"><p className="font-slab text-lg font-bold">Minhas entregas</p><p className="text-sm text-lenha-200">{me?.name}</p></div>
         <span className={cx('ml-auto size-2.5 rounded-full', online ? 'bg-green-400' : 'bg-red-400')} />
         <TeamScreensMenu dark current="/motoboy" />
-        {me?.home?.startsWith('/admin') && <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = me.home))} className="flex h-9 items-center gap-1 rounded-full bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar à tela anterior"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Voltar</button>}
-        <button onClick={logout} className="h-9 rounded-full px-3 text-sm font-semibold hover:bg-white/10">Sair</button>
       </header>
       <main className="mx-auto max-w-2xl space-y-4 p-3">
         {data && (

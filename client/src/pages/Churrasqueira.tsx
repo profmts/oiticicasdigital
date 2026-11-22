@@ -12,7 +12,7 @@ type View = 'brasa' | 'pedido' | 'anteriores';
 
 /** Tela do churrasqueiro: mostra os espetos (setor da churrasqueira) somados por tipo e por pedido, com impressão. */
 export default function Churrasqueira() {
-  const { me, logout, tenant } = useAuth();
+  const { tenant } = useAuth();
   const online = useConnection();
   const [view, setView] = useState<View>('brasa');
   const [sound, toggleSound] = useSoundPref('esp_sound_churras');
@@ -78,10 +78,7 @@ export default function Churrasqueira() {
           <span className="font-cond text-2xl tabnums">{new Date(now).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           <button onClick={toggleSound} className={cx('h-11 rounded-xl px-3 font-semibold', sound ? 'bg-white/10' : 'bg-alerta')}>{sound ? 'Som ligado' : 'Som desligado'}</button>
           <span className={cx('size-3 rounded-full', online ? 'bg-green-400' : 'bg-red-500')} title={online ? 'Conectado' : 'Sem conexão'} />
-          <span className="hidden text-sm text-lenha-200 md:inline">{me?.name}</span>
           <TeamScreensMenu dark current="/churrasqueira" />
-          {me?.home?.startsWith('/admin') && <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = me.home))} className="flex h-11 items-center gap-1 rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">Voltar</button>}
-          <button onClick={logout} className="h-11 rounded-xl px-3 text-sm hover:bg-white/10">Sair</button>
         </div>
       </header>
       {!online && <p className="bg-alerta px-4 py-2 text-center font-semibold">Sem conexão em tempo real. A tela continua atualizando a cada 15 segundos.</p>}

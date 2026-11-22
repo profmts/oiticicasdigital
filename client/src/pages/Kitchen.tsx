@@ -10,7 +10,7 @@ const ORIGIN = (t: any) => (t.type === 'mesa' ? `Mesa ${t.table_label}` : t.type
 type View = 'fila' | 'prontos' | 'anteriores';
 
 export default function Kitchen() {
-  const { me, logout, tenant } = useAuth();
+  const { tenant } = useAuth();
   const online = useConnection();
   const [view, setView] = useState<View>('fila');
   const [sound, toggleSound] = useSoundPref('esp_sound_kds');
@@ -85,10 +85,7 @@ export default function Kitchen() {
           <span className="font-cond text-2xl tabnums">{new Date(now).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           <button onClick={toggleSound} className={cx('h-11 rounded-xl px-3 font-semibold', sound ? 'bg-white/10' : 'bg-alerta')}>{sound ? 'Som ligado' : 'Som desligado'}</button>
           <span className={cx('size-3 rounded-full', online ? 'bg-green-400' : 'bg-red-500')} title={online ? 'Conectado' : 'Sem conexão — reconectando'} />
-          <span className="hidden text-sm text-lenha-200 md:inline">{me?.name}</span>
           <TeamScreensMenu dark current="/cozinha" />
-          {me?.home?.startsWith('/admin') && <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = me.home))} className="flex h-11 items-center gap-1 rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20" title="Voltar à tela anterior"><svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>Voltar</button>}
-          <button onClick={logout} className="h-11 rounded-xl px-3 text-sm hover:bg-white/10">Sair</button>
         </div>
       </header>
       {!online && <p className="bg-alerta px-4 py-2 text-center font-semibold">Sem conexão em tempo real. A tela continua atualizando a cada 15 segundos.</p>}
