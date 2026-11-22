@@ -1,4 +1,4 @@
-export const ROLES = ['admin', 'gerente', 'caixa', 'garcom', 'cozinha', 'motoboy'] as const;
+export const ROLES = ['admin', 'gerente', 'caixa', 'garcom', 'cozinha', 'churrasqueiro', 'motoboy'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -7,6 +7,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   caixa: 'Caixa / Atendente',
   garcom: 'Garçom',
   cozinha: 'Cozinha',
+  churrasqueiro: 'Churrasqueiro',
   motoboy: 'Motoboy',
 };
 
@@ -49,6 +50,7 @@ export const ROLE_DEFAULTS: Record<Role, Permission[]> = {
   ],
   garcom: ['tables.use'],
   cozinha: ['kitchen.use'],
+  churrasqueiro: ['kitchen.use'],
   motoboy: ['delivery.courier'],
 };
 
@@ -56,6 +58,7 @@ export const ROLE_DEFAULTS: Record<Role, Permission[]> = {
 const NEVER: Partial<Record<Role, Permission[]>> = {
   garcom: ['users.manage', 'settings.manage', 'finance.manage', 'audit.view'],
   cozinha: ['users.manage', 'settings.manage', 'finance.manage', 'finance.view', 'orders.view_values', 'audit.view'],
+  churrasqueiro: ['users.manage', 'settings.manage', 'finance.manage', 'finance.view', 'orders.view_values', 'audit.view'],
   motoboy: ['users.manage', 'settings.manage', 'finance.manage', 'finance.view', 'orders.view', 'audit.view', 'customers.view'],
 };
 
@@ -76,11 +79,12 @@ export const ROLE_HOME: Record<Role, string> = {
   caixa: '/admin/pdv',
   garcom: '/garcom',
   cozinha: '/cozinha',
+  churrasqueiro: '/churrasqueira',
   motoboy: '/motoboy',
 };
 
 /** Telas de equipe (fora do painel) por papel. */
-const TEAM_HOME: Partial<Record<Role, string>> = { garcom: '/garcom', cozinha: '/cozinha', motoboy: '/motoboy' };
+const TEAM_HOME: Partial<Record<Role, string>> = { garcom: '/garcom', cozinha: '/cozinha', churrasqueiro: '/churrasqueira', motoboy: '/motoboy' };
 
 /**
  * Permissões que, se concedidas, dão acesso ao painel administrativo (/admin).

@@ -593,6 +593,8 @@ test('36 R7: planos (3 criados), suporte e nota fiscal só com recurso no plano'
   assert.equal(maximo.features.delivery, true); assert.equal(comeco.features.delivery, false);
   assert.ok(plans.find((p: any) => p.name === 'Equipe'), 'plano Equipe existe');
   assert.ok(plans.find((p: any) => p.name === 'Interno'), 'plano Interno existe');
+  assert.equal(comeco.features.churrasqueira, false, 'Começo sem churrasqueira');
+  assert.equal(maximo.features.churrasqueira, true, 'Profissional com churrasqueira');
   // Sem o recurso no plano, os endpoints fiscais são bloqueados.
   await db.run('UPDATE tenants SET plan_id = $1 WHERE slug = $2', [comeco.id, SLUG]);
   assert.equal((await admin.get('/api/admin/settings/fiscal')).status, 409, 'plano sem nota fiscal bloqueia');
@@ -654,4 +656,16 @@ test('38 R11: churrasqueira e cozinha separadas por setor', async () => {
   // Churrasqueiro marca os espetos: agora o pedido fica pronto.
   ok(await cozinha.post(`/api/kitchen/tickets/${tC.id}/status`, { to: 'pronto', sector: 'espetos' }));
   assert.equal(ok(await admin.get(`/api/orders/${oid}`)).status, 'pronto', 'pedido pronto com tudo feito');
+});
+
+test('39 R12: perfil churrasqueiro e churrasqueira como recurso de plano', async () => {
+  const meta = ok(await admin.get('/api/admin/users/meta'));
+  assert.ok(meta.roles.find((r: any) => r.id === 'churrasqueiro' && r.label === 'Churrasqueiro'), 'perfil churrasqueiro existe');
+  ok(await admin.post('/api/admin/users', { name: 'Churras', username: 'churras', role: 'churrasqueiro', password: 'senha123' }));
+  const c = new Client(); await c.login('churras');
+  const me = ok(await c.get('/api/auth/me')).user;
+  assert.equal(me.home, '/churrasqueira', 'churrasqueiro vai para a tela da churrasqueira');
+  assert.ok(me.permissions.includes('kitchen.use'), 'tem permissão para a tela da churrasqueira');
+  assert.equal((await c.get('/api/kitchen/tickets?sector=espetos')).status, 200, 'acessa a churrasqueira');
+  assert.equal((await c.get('/api/admin/users')).status, 403, 'não acessa o painel admin');
 });

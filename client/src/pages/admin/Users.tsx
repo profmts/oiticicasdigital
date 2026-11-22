@@ -4,7 +4,7 @@ import { useAuth, useData } from '../../lib/hooks';
 import { Badge, Button, Field, Input, Modal, Select, PhoneInput, LoginInput, PasswordFields, pwValid, Spinner, Toggle, useAction, cx } from '../../components/ui';
 
 /** Login sugerido por função. */
-const ROLE_USER: Record<string, string> = { admin: 'dono', gerente: 'gerente', caixa: 'caixa', garcom: 'garcom', cozinha: 'cozinha', motoboy: 'motoboy' };
+const ROLE_USER: Record<string, string> = { admin: 'dono', gerente: 'gerente', caixa: 'caixa', garcom: 'garcom', cozinha: 'cozinha', churrasqueiro: 'churrasqueiro', motoboy: 'motoboy' };
 
 /** M2: remover (excluir) um membro da equipe, com a confirmação da senha do administrador. */
 function RemoverUsuario({ alvo, onClose, onDone }: { alvo: any; onClose: () => void; onDone: () => void }) {
